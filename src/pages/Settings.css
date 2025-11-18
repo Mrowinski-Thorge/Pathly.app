@@ -32,8 +32,8 @@ body.dark-mode .settings-container {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 24px;
-  gap: 20px;
+  padding: 20px;
+  gap: 16px;
 }
 
 .setting-info {
@@ -71,19 +71,19 @@ body.dark-mode .setting-icon svg {
 }
 
 /* Theme Icon Toggle */
-.sun-icon-setting {
+.moon-icon-setting {
   display: block;
 }
 
-.moon-icon-setting {
-  display: none;
-}
-
-body.dark-mode .sun-icon-setting {
+.sun-icon-setting {
   display: none;
 }
 
 body.dark-mode .moon-icon-setting {
+  display: none;
+}
+
+body.dark-mode .sun-icon-setting {
   display: block;
 }
 
