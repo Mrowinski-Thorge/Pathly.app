@@ -1,5 +1,7 @@
 # Pathly App
 
+🚀 Live unter: https://mrowinski-thorge.github.io/Pathly.app/
+
 Eine geschützte React-Anwendung mit Supabase-Authentifizierung.
 
 ## Features
