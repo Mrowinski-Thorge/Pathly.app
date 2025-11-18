@@ -89,7 +89,7 @@ body.dark-mode .sun-icon-setting {
 }
 
 .setting-text h3 {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 500;
   color: black;
   margin-bottom: 4px;
@@ -101,7 +101,7 @@ body.dark-mode .setting-text h3 {
 }
 
 .setting-text p {
-  font-size: 13px;
+  font-size: 14px;
   color: rgba(0, 0, 0, 0.6);
   font-weight: 300;
   margin: 0;
