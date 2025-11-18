@@ -1,0 +1,266 @@
+.settings-container {
+  min-height: 100vh;
+  background: white;
+  transition: background 0.3s ease;
+}
+
+body.dark-mode .settings-container {
+  background: #000;
+}
+
+.settings-main {
+  padding: 140px 24px 40px;
+}
+
+.settings-content {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.settings-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.setting-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.setting-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px;
+  gap: 20px;
+}
+
+.setting-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+}
+
+.setting-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+body.dark-mode .setting-icon {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.setting-icon svg {
+  width: 24px;
+  height: 24px;
+  color: black;
+  transition: color 0.3s ease;
+}
+
+body.dark-mode .setting-icon svg {
+  color: white;
+}
+
+/* Theme Icon Toggle */
+.sun-icon-setting {
+  display: block;
+}
+
+.moon-icon-setting {
+  display: none;
+}
+
+body.dark-mode .sun-icon-setting {
+  display: none;
+}
+
+body.dark-mode .moon-icon-setting {
+  display: block;
+}
+
+.setting-text h3 {
+  font-size: 18px;
+  font-weight: 500;
+  color: black;
+  margin-bottom: 4px;
+  transition: color 0.3s ease;
+}
+
+body.dark-mode .setting-text h3 {
+  color: white;
+}
+
+.setting-text p {
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.6);
+  font-weight: 300;
+  margin: 0;
+  transition: color 0.3s ease;
+}
+
+body.dark-mode .setting-text p {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Toggle Button */
+.toggle-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.toggle-switch {
+  width: 56px;
+  height: 32px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 16px;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.toggle-switch.active {
+  background: black;
+}
+
+body.dark-mode .toggle-switch {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+body.dark-mode .toggle-switch.active {
+  background: white;
+}
+
+.toggle-slider {
+  width: 26px;
+  height: 26px;
+  background: white;
+  border-radius: 50%;
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-switch.active .toggle-slider {
+  transform: translateX(24px);
+  background: white;
+}
+
+body.dark-mode .toggle-slider {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+body.dark-mode .toggle-switch.active .toggle-slider {
+  background: black;
+}
+
+/* Back Button */
+.back-button {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+  width: 40px;
+  height: 40px;
+}
+
+.back-button:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+body.dark-mode .back-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.back-button svg {
+  width: 24px;
+  height: 24px;
+  color: black;
+  transition: color 0.3s ease;
+}
+
+body.dark-mode .back-button svg {
+  color: white;
+}
+
+/* Password Change Form */
+.password-change-form {
+  padding: 24px;
+}
+
+.password-change-form h3 {
+  font-size: 18px;
+  font-weight: 500;
+  color: black;
+  margin-bottom: 20px;
+  transition: color 0.3s ease;
+}
+
+body.dark-mode .password-change-form h3 {
+  color: white;
+}
+
+/* Danger Card */
+.danger-card .setting-icon {
+  background: rgba(220, 38, 38, 0.1);
+}
+
+.danger-icon svg {
+  color: #dc2626 !important;
+}
+
+.btn-danger {
+  background: #dc2626;
+  color: white;
+  border: 2px solid #dc2626;
+  padding: 10px 24px;
+  border-radius: 50px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-danger:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+  transform: scale(1.05);
+}
+
+@media (max-width: 768px) {
+  .settings-main {
+    padding: 120px 16px 24px;
+  }
+
+  .setting-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .setting-info {
+    width: 100%;
+  }
+
+  .btn-secondary,
+  .btn-danger,
+  .toggle-button {
+    width: 100%;
+  }
+}

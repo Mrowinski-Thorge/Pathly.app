@@ -1,0 +1,282 @@
+.auth-container {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  background: white;
+  transition: background 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+body.dark-mode .auth-container {
+  background: linear-gradient(135deg, #000000 0%, #0a0a0a 50%, #000000 100%);
+}
+
+/* Theme Toggle Button - Floating */
+.theme-toggle-floating {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 50px;
+  height: 50px;
+  z-index: 1000;
+  transition: all 0.3s ease;
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.15);
+}
+
+body.dark-mode .theme-toggle-floating {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.theme-toggle-floating:hover {
+  transform: rotate(15deg) scale(1.05);
+  background: rgba(0, 0, 0, 0.1);
+}
+
+body.dark-mode .theme-toggle-floating:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.theme-toggle-floating .sun-icon,
+.theme-toggle-floating .moon-icon {
+  width: 24px;
+  height: 24px;
+  color: black;
+  transition: all 0.3s ease;
+}
+
+body.dark-mode .theme-toggle-floating .sun-icon,
+body.dark-mode .theme-toggle-floating .moon-icon {
+  color: white;
+}
+
+.theme-toggle-floating .sun-icon {
+  display: block;
+}
+
+.theme-toggle-floating .moon-icon {
+  display: none;
+}
+
+body.dark-mode .theme-toggle-floating .sun-icon {
+  display: none;
+}
+
+body.dark-mode .theme-toggle-floating .moon-icon {
+  display: block;
+}
+
+/* Subtle blur effects in background */
+.auth-container::before,
+.auth-container::after {
+  content: '';
+  position: absolute;
+  width: 400px;
+  height: 400px;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 50%;
+  filter: blur(80px);
+  transition: background 0.3s ease;
+}
+
+body.dark-mode .auth-container::before,
+body.dark-mode .auth-container::after {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.auth-container::before {
+  top: -100px;
+  left: -100px;
+}
+
+.auth-container::after {
+  bottom: -100px;
+  right: -100px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 450px;
+  animation: fadeInUp 0.5s ease;
+  position: relative;
+  z-index: 10;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.auth-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.auth-header h1 {
+  font-size: 32px;
+  font-weight: 300;
+  color: black;
+  margin-bottom: 8px;
+  letter-spacing: -0.5px;
+  transition: color 0.3s ease;
+}
+
+body.dark-mode .auth-header h1 {
+  color: white;
+}
+
+.auth-header p {
+  color: rgba(0, 0, 0, 0.6);
+  font-size: 16px;
+  font-weight: 300;
+  transition: color 0.3s ease;
+}
+
+body.dark-mode .auth-header p {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.auth-form {
+  margin-bottom: 24px;
+}
+
+.btn-full {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.auth-footer {
+  text-align: center;
+  padding-top: 20px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  transition: border-color 0.3s ease;
+}
+
+body.dark-mode .auth-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.link-button {
+  background: none;
+  border: none;
+  color: black;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+}
+
+.link-button:hover {
+  text-decoration-color: black;
+}
+
+body.dark-mode .link-button {
+  color: white;
+}
+
+body.dark-mode .link-button:hover {
+  text-decoration-color: white;
+}
+
+/* Forgot Password Link */
+.forgot-password-link {
+  text-align: right;
+  margin-bottom: 12px;
+  margin-top: -8px;
+}
+
+.link-button-small {
+  background: none;
+  border: none;
+  color: rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  padding: 0;
+}
+
+.link-button-small:hover {
+  color: black;
+  text-decoration: underline;
+}
+
+body.dark-mode .link-button-small {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+body.dark-mode .link-button-small:hover {
+  color: white;
+}
+
+/* Terms Checkbox */
+.terms-checkbox {
+  margin-bottom: 20px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkbox-input {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: black;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+body.dark-mode .checkbox-input {
+  accent-color: white;
+}
+
+.checkbox-text {
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.7);
+  line-height: 1.5;
+  transition: color 0.3s ease;
+}
+
+body.dark-mode .checkbox-text {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.terms-link {
+  color: black;
+  text-decoration: underline;
+  transition: all 0.3s ease;
+}
+
+.terms-link:hover {
+  opacity: 0.7;
+}
+
+body.dark-mode .terms-link {
+  color: white;
+}
