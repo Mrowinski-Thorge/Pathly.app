@@ -56,7 +56,7 @@ function AppRoutes() {
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter basename="/pathly.app">
+      <BrowserRouter basename="/Pathly.app">
         <AppRoutes />
       </BrowserRouter>
     </AuthProvider>
