@@ -32,7 +32,7 @@ body.dark-mode .settings-container {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px;
+  padding: 14px 16px;
   gap: 16px;
 }
 
@@ -64,6 +64,7 @@ body.dark-mode .setting-icon {
   height: 20px;
   color: black;
   transition: color 0.3s ease;
+  transform: translateY(-1px);
 }
 
 body.dark-mode .setting-icon svg {
@@ -246,7 +247,7 @@ body.dark-mode .back-button svg {
 
 /* Password Change Form */
 .password-change-form {
-  padding: 24px;
+  padding: 16px;
 }
 
 .password-change-form h3 {
