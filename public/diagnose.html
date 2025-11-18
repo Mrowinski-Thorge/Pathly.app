@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pathly App - Diagnose</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .status { 
+            padding: 15px; 
+            margin: 10px 0; 
+            border-radius: 8px; 
+            background: white;
+            border-left: 4px solid #ccc;
+        }
+        .success { border-left-color: #4CAF50; }
+        .error { border-left-color: #f44336; }
+        .warning { border-left-color: #ff9800; }
+        .info { border-left-color: #2196F3; }
+        code { 
+            background: #f5f5f5; 
+            padding: 2px 6px; 
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+        h1 { color: #333; }
+        h2 { color: #666; margin-top: 30px; }
+        pre {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Pathly App - Diagnose</h1>
+    
+    <div id="results"></div>
+
+    <script>
+        const results = document.getElementById('results');
+        
+        function addStatus(title, message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.innerHTML = `<strong>${title}</strong><br>${message}`;
+            results.appendChild(div);
+        }
+
+        // 1. Basic JavaScript
+        addStatus('✓ JavaScript läuft', 'JavaScript wird korrekt ausgeführt', 'success');
+
+        // 2. URL Info
+        addStatus('🌐 Aktuelle URL', `
+            <strong>href:</strong> <code>${window.location.href}</code><br>
+            <strong>origin:</strong> <code>${window.location.origin}</code><br>
+            <strong>pathname:</strong> <code>${window.location.pathname}</code><br>
+            <strong>base:</strong> <code>${document.baseURI}</code>
+        `, 'info');
+
+        // 3. Check if assets are reachable
+        async function checkAsset(url, name) {
+            try {
+                const response = await fetch(url, { method: 'HEAD' });
+                const contentType = response.headers.get('content-type');
+                if (response.ok) {
+                    addStatus(`✓ ${name}`, `
+                        <strong>Status:</strong> ${response.status}<br>
+                        <strong>Content-Type:</strong> <code>${contentType}</code><br>
+                        <strong>URL:</strong> <code>${url}</code>
+                    `, 'success');
+                } else {
+                    addStatus(`✗ ${name}`, `
+                        <strong>Status:</strong> ${response.status}<br>
+                        <strong>URL:</strong> <code>${url}</code>
+                    `, 'error');
+                }
+            } catch (error) {
+                addStatus(`✗ ${name}`, `
+                    <strong>Fehler:</strong> ${error.message}<br>
+                    <strong>URL:</strong> <code>${url}</code>
+                `, 'error');
+            }
+        }
+
+        // 4. Check React assets
+        addStatus('🔄 Teste Assets...', 'Prüfe ob JavaScript und CSS erreichbar sind', 'info');
+        
+        setTimeout(async () => {
+            // Find script and link tags from main index.html
+            await checkAsset('/Pathly.app/assets/index-Ci4v3deC.js', 'React JavaScript Bundle');
+            await checkAsset('/Pathly.app/assets/index-BROQT1Hh.css', 'React CSS Bundle');
+            await checkAsset('/Pathly.app/favicon.svg', 'Favicon SVG');
+            
+            // Try to load React dynamically
+            addStatus('🔄 Versuche React zu laden...', 'Dynamischer Import Test', 'info');
+            
+            const script = document.createElement('script');
+            script.type = 'module';
+            script.crossOrigin = 'anonymous';
+            script.src = '/Pathly.app/assets/index-Ci4v3deC.js';
+            script.onload = () => {
+                addStatus('✓ React Script geladen', 'Das Script wurde erfolgreich geladen', 'success');
+            };
+            script.onerror = (e) => {
+                addStatus('✗ React Script Fehler', `Das Script konnte nicht geladen werden: ${e}`, 'error');
+            };
+            document.head.appendChild(script);
+        }, 100);
+
+        // 5. Browser info
+        addStatus('💻 Browser Info', `
+            <strong>User Agent:</strong> <code>${navigator.userAgent}</code><br>
+            <strong>Platform:</strong> <code>${navigator.platform}</code><br>
+            <strong>Sprache:</strong> <code>${navigator.language}</code>
+        `, 'info');
+    </script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Test Page</title>
+</head>
+<body>
+    <h1>Test Page</h1>
+    <p>If you can see this, HTML works!</p>
+    <div id="test"></div>
+    <script>
+        document.getElementById('test').innerHTML = '<p style="color: green; font-weight: bold;">✓ JavaScript works!</p>';
+        console.log('JavaScript is running!');
+        console.log('Current URL:', window.location.href);
+        console.log('Base URL:', window.location.origin);
+    </script>
+</body>
+</html>
