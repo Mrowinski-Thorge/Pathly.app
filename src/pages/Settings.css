@@ -262,6 +262,18 @@ body.dark-mode .password-change-form h3 {
   color: white;
 }
 
+.button-group {
+  display: flex;
+  gap: 16px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+.button-group .btn {
+  flex: 1;
+  min-width: 120px;
+}
+
 /* Danger Card */
 .danger-card .setting-icon {
   background: rgba(220, 38, 38, 0.1);
