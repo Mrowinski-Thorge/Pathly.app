@@ -24,7 +24,7 @@ body.dark-mode .dashboard-container {
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border-radius: 24px;
-  padding: 16px 32px;
+  padding: 12px 24px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -78,7 +78,7 @@ body.dark-mode .settings-button svg {
 }
 
 .navbar-brand {
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 300;
   color: black;
   letter-spacing: -0.5px;

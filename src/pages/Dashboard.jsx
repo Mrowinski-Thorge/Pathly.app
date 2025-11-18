@@ -35,26 +35,12 @@ export default function Dashboard() {
         <div className="navbar-content">
           <h1 className="navbar-brand">Pathly App</h1>
           <div className="nav-actions">
-            <button onClick={toggleTheme} className="theme-toggle" aria-label="Theme umschalten">
-              <svg className="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="5"></circle>
-                <line x1="12" y1="1" x2="12" y2="3"></line>
-                <line x1="12" y1="21" x2="12" y2="23"></line>
-                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-                <line x1="1" y1="12" x2="3" y2="12"></line>
-                <line x1="21" y1="12" x2="23" y2="12"></line>
-                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-              </svg>
-              <svg className="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-              </svg>
-            </button>
             <button onClick={() => navigate('/settings')} className="settings-button" aria-label="Einstellungen">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="3"></circle>
-                <path d="M12 1v6m0 6v6m5.2-14l-3 5.2m-3 5.2l-3 5.2M23 12h-6m-6 0H5m14-5.2l-5.2 3m-5.2 3l-5.2 3m16.4 0l-5.2-3m-5.2-3L1.8 6.8"></path>
+                <path d="M12 1v6m0 6v6"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15c.1-.3.1-.6.1-1s0-.7-.1-1l2.1-1.6c.2-.1.2-.4.1-.6l-2-3.5c-.1-.2-.4-.3-.6-.2l-2.5 1c-.5-.4-1.1-.7-1.7-1l-.4-2.6c0-.2-.2-.4-.5-.4h-4c-.3 0-.5.2-.5.4l-.4 2.7c-.6.2-1.1.6-1.7 1l-2.4-1c-.3-.1-.5 0-.7.2l-2 3.5c-.1.2-.1.5.1.6l2.1 1.6c-.1.3-.1.6-.1 1s0 .7.1 1l-2.1 1.6c-.2.1-.2.4-.1.6l2 3.5c.1.2.4.3.6.2l2.5-1c.5.4 1.1.7 1.7 1l.4 2.6c0 .2.2.4.5.4h4c.3 0 .5-.2.5-.4l.4-2.7c.6-.2 1.2-.6 1.7-1l2.4 1c.3.1.5 0 .7-.2l2-3.5c.1-.2.1-.5-.1-.6l-2.1-1.6z"></path>
               </svg>
             </button>
           </div>

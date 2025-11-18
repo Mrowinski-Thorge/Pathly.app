@@ -9,7 +9,7 @@ body.dark-mode .settings-container {
 }
 
 .settings-main {
-  padding: 140px 24px 40px;
+  padding: 100px 24px 40px;
 }
 
 .settings-content {
@@ -109,6 +109,51 @@ body.dark-mode .setting-text h3 {
 
 body.dark-mode .setting-text p {
   color: rgba(255, 255, 255, 0.6);
+}
+
+/* Theme Icon Button */
+.theme-icon-button {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+  width: 40px;
+  height: 40px;
+}
+
+.theme-icon-button:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+body.dark-mode .theme-icon-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.theme-icon-button .sun-icon {
+  display: block;
+  width: 24px;
+  height: 24px;
+  color: black;
+}
+
+.theme-icon-button .moon-icon {
+  display: none;
+  width: 24px;
+  height: 24px;
+  color: white;
+}
+
+body.dark-mode .theme-icon-button .sun-icon {
+  display: none;
+}
+
+body.dark-mode .theme-icon-button .moon-icon {
+  display: block;
 }
 
 /* Toggle Button */
