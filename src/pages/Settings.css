@@ -32,7 +32,7 @@ body.dark-mode .settings-container {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px;
+  padding: 16px;
   gap: 16px;
 }
 
@@ -44,8 +44,8 @@ body.dark-mode .settings-container {
 }
 
 .setting-icon {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   border-radius: 12px;
   background: rgba(0, 0, 0, 0.05);
   display: flex;
@@ -60,8 +60,8 @@ body.dark-mode .setting-icon {
 }
 
 .setting-icon svg {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   color: black;
   transition: color 0.3s ease;
 }
