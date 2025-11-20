@@ -84,27 +84,19 @@ export default function Settings() {
     setMessage({ type: '', text: '' })
 
     try {
-      // Erst alle Habit-Daten löschen
-      const { error: habitsError } = await supabase
-        .from('habits')
-        .delete()
-        .eq('user_id', user.id)
+      // Markiere Account als gelöscht (Soft-Delete)
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          deleted_at: new Date().toISOString()
+        })
+        .eq('id', user.id)
 
-      if (habitsError) throw habitsError
+      if (error) throw error
 
-      const { error: completionsError } = await supabase
-        .from('habit_completions')
-        .delete()
-        .eq('user_id', user.id)
-
-      if (completionsError) throw completionsError
-
-      // Dann Account über Admin API löschen (falls verfügbar)
-      // Hinweis: Das erfordert Service-Key auf Backend-Seite
-      // Für jetzt melden wir nur ab und zeigen Info
       setMessage({ 
         type: 'success', 
-        text: 'Account-Daten wurden gelöscht. Bitte kontaktiere den Support für vollständige Account-Löschung.' 
+        text: 'Account wird in 30 Tagen gelöscht. Bei erneutem Login wird die Löschung abgebrochen.' 
       })
       
       setTimeout(async () => {

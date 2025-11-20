@@ -59,6 +59,16 @@ export const AuthProvider = ({ children }) => {
       email,
       password
     })
+    
+    // Reaktiviere Account wenn er zum Löschen markiert war
+    if (data?.user) {
+      await supabase
+        .from('profiles')
+        .update({ deleted_at: null })
+        .eq('id', data.user.id)
+        .is('deleted_at', 'not.null')
+    }
+    
     return { data, error }
   }
 

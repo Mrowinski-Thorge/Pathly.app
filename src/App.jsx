@@ -3,7 +3,6 @@ import { AuthProvider, useAuth } from './AuthContext'
 import Auth from './pages/Auth'
 import Home from './pages/Home'
 import Statistics from './pages/Statistics'
-import AIChat from './pages/AIChat'
 import Settings from './pages/Settings'
 import BottomNav from './components/BottomNav'
 import SettingsIcon from './components/SettingsIcon'
@@ -63,14 +62,6 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <Statistics />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/ai-chat"
-          element={
-            <ProtectedRoute>
-              <AIChat />
             </ProtectedRoute>
           }
         />

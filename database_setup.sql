@@ -251,3 +251,14 @@ BEGIN
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Funktion um Goal Progress zu erhöhen
+CREATE OR REPLACE FUNCTION increment_goal_progress(goal_id UUID, amount NUMERIC)
+RETURNS void AS $$
+BEGIN
+  UPDATE goals
+  SET current_value = current_value + amount,
+      updated_at = NOW()
+  WHERE id = goal_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
