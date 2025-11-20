@@ -1,0 +1,72 @@
+.floating-settings-button {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 50px;
+  height: 50px;
+  background: #000;
+  border: 2px solid #000;
+  border-radius: 50%;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+  z-index: 999;
+}
+
+.dark-mode .floating-settings-button {
+  background: #fff;
+  border-color: #fff;
+  color: #000;
+  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.15);
+}
+
+.floating-settings-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.dark-mode .floating-settings-button:hover {
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
+}
+
+.floating-settings-button:active {
+  transform: scale(0.95);
+}
+
+.floating-settings-button svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* Mobile Optimierung */
+@media (max-width: 768px) {
+  .floating-settings-button {
+    top: 15px;
+    right: 15px;
+    width: 45px;
+    height: 45px;
+  }
+
+  .floating-settings-button svg {
+    width: 22px;
+    height: 22px;
+  }
+}
+
+/* Desktop - zentriert positionieren wenn Container schmal ist */
+@media (min-width: 769px) {
+  .floating-settings-button {
+    position: fixed;
+    right: calc(50% - 400px + 20px);
+  }
+}
+
+@media (min-width: 1200px) {
+  .floating-settings-button {
+    right: calc(50% - 450px + 30px);
+  }
+}

@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../AuthContext'
+import { supabase } from '../supabaseClient'
 import './Settings.css'
 
 export default function Settings() {
   const { user, signOut, updatePassword } = useAuth()
   const navigate = useNavigate()
   const [showPasswordChange, setShowPasswordChange] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -77,22 +79,58 @@ export default function Settings() {
     }
   }
 
+  const handleDeleteAccount = async () => {
+    setLoading(true)
+    setMessage({ type: '', text: '' })
+
+    try {
+      // Erst alle Habit-Daten löschen
+      const { error: habitsError } = await supabase
+        .from('habits')
+        .delete()
+        .eq('user_id', user.id)
+
+      if (habitsError) throw habitsError
+
+      const { error: completionsError } = await supabase
+        .from('habit_completions')
+        .delete()
+        .eq('user_id', user.id)
+
+      if (completionsError) throw completionsError
+
+      // Dann Account über Admin API löschen (falls verfügbar)
+      // Hinweis: Das erfordert Service-Key auf Backend-Seite
+      // Für jetzt melden wir nur ab und zeigen Info
+      setMessage({ 
+        type: 'success', 
+        text: 'Account-Daten wurden gelöscht. Bitte kontaktiere den Support für vollständige Account-Löschung.' 
+      })
+      
+      setTimeout(async () => {
+        await signOut()
+      }, 3000)
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Fehler beim Löschen: ' + error.message })
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="settings-container">
-      <nav className="navbar">
-        <div className="navbar-content">
-          <button onClick={() => navigate('/')} className="back-button" aria-label="Zurück">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M19 12H5M12 19l-7-7 7-7"/>
-            </svg>
-          </button>
-          <h1 className="navbar-brand">Einstellungen</h1>
-          <div style={{ width: '40px' }}></div>
-        </div>
-      </nav>
-
       <main className="settings-main">
         <div className="settings-content">
+          <div className="settings-header">
+            <button onClick={() => navigate('/')} className="back-button-settings" aria-label="Zurück">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M19 12H5M12 19l-7-7 7-7"/>
+              </svg>
+              <span>Zurück</span>
+            </button>
+            <h1>Einstellungen</h1>
+            <p className="subtitle">Verwalte deinen Account</p>
+          </div>
+
           {message.text && (
             <div className={`alert alert-${message.type}`}>
               {message.text}
@@ -268,6 +306,62 @@ export default function Settings() {
                   Abmelden
                 </button>
               </div>
+            </div>
+
+            {/* Delete Account */}
+            <div className="card setting-card danger-card">
+              {!showDeleteConfirm ? (
+                <div className="setting-item">
+                  <div className="setting-info">
+                    <div className="setting-icon danger-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
+                        <line x1="10" y1="11" x2="10" y2="17"></line>
+                        <line x1="14" y1="11" x2="14" y2="17"></line>
+                      </svg>
+                    </div>
+                    <div className="setting-text">
+                      <h3>Account löschen</h3>
+                      <p>Alle deine Daten werden unwiderruflich gelöscht</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setShowDeleteConfirm(true)} 
+                    className="btn btn-danger"
+                  >
+                    Löschen
+                  </button>
+                </div>
+              ) : (
+                <div className="delete-confirm">
+                  <div className="warning-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"></path>
+                      <line x1="12" y1="9" x2="12" y2="13"></line>
+                      <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                  </div>
+                  <h3>Account wirklich löschen?</h3>
+                  <p>Diese Aktion kann nicht rückgängig gemacht werden. Alle deine Habits und Statistiken werden permanent gelöscht.</p>
+                  <div className="button-group">
+                    <button
+                      onClick={handleDeleteAccount}
+                      className="btn btn-danger"
+                      disabled={loading}
+                    >
+                      {loading ? 'Wird gelöscht...' : 'Ja, Account löschen'}
+                    </button>
+                    <button
+                      onClick={() => setShowDeleteConfirm(false)}
+                      className="btn btn-secondary"
+                      disabled={loading}
+                    >
+                      Abbrechen
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

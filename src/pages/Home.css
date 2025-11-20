@@ -1,0 +1,441 @@
+.home-container {
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+  padding-bottom: 100px; /* Platz für Bottom Navigation */
+}
+
+.home-content {
+  width: 100%;
+}
+
+.home-header {
+  margin-bottom: 30px;
+  text-align: center;
+}
+
+.home-header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: #000;
+}
+
+.dark-mode .home-header h1 {
+  color: #fff;
+}
+
+.username-prompt-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.username-prompt-content {
+  background: white;
+  border-radius: 20px;
+  padding: 50px 40px;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  max-width: 400px;
+  width: 100%;
+}
+
+.dark-mode .username-prompt-content {
+  background: #2a2a2a;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.username-prompt-content h1 {
+  font-size: 2rem;
+  margin-bottom: 12px;
+  color: #000;
+}
+
+.dark-mode .username-prompt-content h1 {
+  color: #fff;
+}
+
+.username-prompt-content p {
+  font-size: 1.1rem;
+  color: #666;
+  margin-bottom: 30px;
+}
+
+.dark-mode .username-prompt-content p {
+  color: #aaa;
+}
+
+.username-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.username-input {
+  padding: 16px 20px;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  font-size: 1.1rem;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.username-input:focus {
+  outline: none;
+  border-color: #000;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
+}
+
+.dark-mode .username-input {
+  background: #1a1a1a;
+  border-color: #444;
+  color: white;
+}
+
+.dark-mode .username-input:focus {
+  border-color: #fff;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+}
+
+.username-submit {
+  padding: 16px 32px;
+  background: #000;
+  color: white;
+  border: 2px solid #000;
+  border-radius: 12px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.username-submit:hover {
+  background: #fff;
+  color: #000;
+}
+
+.dark-mode .username-submit {
+  background: #fff;
+  color: #000;
+  border-color: #fff;
+}
+
+.dark-mode .username-submit:hover {
+  background: #000;
+  color: #fff;
+}
+
+.subtitle {
+  color: #666;
+  font-size: 0.95rem;
+}
+
+.dark-mode .subtitle {
+  color: #aaa;
+}
+
+.add-habit-form {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 30px;
+}
+
+.habit-input {
+  flex: 1;
+  padding: 14px 18px;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  background: white;
+}
+
+.habit-input:focus {
+  outline: none;
+  border-color: #000;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
+}
+
+.dark-mode .habit-input {
+  background: #2a2a2a;
+  border-color: #444;
+  color: white;
+}
+
+.dark-mode .habit-input:focus {
+  border-color: #fff;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+}
+
+.add-button {
+  padding: 14px 18px;
+  background: #000;
+  border: 2px solid #000;
+  border-radius: 12px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dark-mode .add-button {
+  background: #fff;
+  border-color: #fff;
+  color: #000;
+}
+
+.add-button svg {
+  width: 24px;
+  height: 24px;
+}
+
+.add-button:hover {
+  background: #fff;
+  color: #000;
+  border-color: #000;
+}
+
+.dark-mode .add-button:hover {
+  background: #000;
+  color: #fff;
+  border-color: #fff;
+}
+
+.add-button:active {
+  transform: translateY(0);
+}
+
+.habits-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.habit-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.habit-item.completing {
+  animation: checkAnimation 0.6s ease;
+}
+
+@keyframes checkAnimation {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 8px 24px rgba(76, 175, 80, 0.3);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.habit-item.completed {
+  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+  opacity: 0.7;
+}
+
+.dark-mode .habit-item {
+  background: #2a2a2a;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.dark-mode .habit-item.completed {
+  background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 100%);
+}
+
+.habit-checkbox-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex: 1;
+  cursor: pointer;
+  user-select: none;
+}
+
+.habit-checkbox {
+  width: 28px;
+  height: 28px;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.habit-item.completed .habit-checkbox {
+  background: #4CAF50;
+  border-color: #4CAF50;
+  animation: checkBounce 0.6s ease;
+}
+
+@keyframes checkBounce {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+}
+
+.habit-checkbox svg {
+  width: 18px;
+  height: 18px;
+  color: white;
+  animation: checkDraw 0.3s ease;
+}
+
+@keyframes checkDraw {
+  from {
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+  }
+  to {
+    stroke-dasharray: 100;
+    stroke-dashoffset: 0;
+  }
+}
+
+.dark-mode .habit-checkbox {
+  border-color: #555;
+}
+
+.habit-checkbox-wrapper:hover .habit-checkbox {
+  border-color: #000;
+  transform: scale(1.1);
+}
+
+.dark-mode .habit-checkbox-wrapper:hover .habit-checkbox {
+  border-color: #fff;
+}
+
+.habit-name {
+  font-size: 1.05rem;
+  color: #333;
+  font-weight: 500;
+}
+
+.habit-item.completed .habit-name {
+  text-decoration: line-through;
+  color: #666;
+}
+
+.dark-mode .habit-name {
+  color: #e0e0e0;
+}
+
+.dark-mode .habit-item.completed .habit-name {
+  color: #aaa;
+}
+
+.delete-button {
+  padding: 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #999;
+  transition: all 0.3s ease;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.delete-button svg {
+  width: 20px;
+  height: 20px;
+}
+
+.delete-button:hover {
+  background: #ffebee;
+  color: #f44336;
+}
+
+.dark-mode .delete-button:hover {
+  background: #3a1f1f;
+  color: #ff6b6b;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #999;
+}
+
+.empty-state svg {
+  width: 80px;
+  height: 80px;
+  margin-bottom: 20px;
+  opacity: 0.3;
+}
+
+.empty-state p {
+  font-size: 1.2rem;
+  margin-bottom: 8px;
+  color: #666;
+}
+
+.empty-state span {
+  font-size: 0.95rem;
+  color: #999;
+}
+
+.dark-mode .empty-state p {
+  color: #aaa;
+}
+
+.dark-mode .empty-state span {
+  color: #777;
+}
+
+/* Mobile Optimierung */
+@media (max-width: 768px) {
+  .home-container {
+    padding: 15px;
+  }
+
+  .home-header h1 {
+    font-size: 1.75rem;
+  }
+
+  .habit-input {
+    padding: 12px 16px;
+  }
+
+  .add-button {
+    padding: 12px 16px;
+  }
+
+  .habit-item {
+    padding: 15px 16px;
+  }
+}
