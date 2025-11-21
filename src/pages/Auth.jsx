@@ -73,8 +73,32 @@ export default function Auth() {
 
     try {
       if (isLogin) {
-        const { error } = await signIn(email, password)
-        if (error) throw error
+        const { data: authData, error: signInError } = await signIn(email, password)
+        if (signInError) throw signInError
+
+        // Prüfe ob Account zum Löschen markiert ist
+        if (authData?.user) {
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('deleted_at')
+            .eq('id', authData.user.id)
+            .single()
+
+          // Wenn deleted_at gesetzt ist, entferne es (Löschung abbrechen)
+          if (profile?.deleted_at) {
+            const { error: updateError } = await supabase
+              .from('profiles')
+              .update({ deleted_at: null })
+              .eq('id', authData.user.id)
+
+            if (!updateError) {
+              setMessage({ 
+                type: 'success', 
+                text: '✅ Willkommen zurück! Die Löschung deines Accounts wurde abgebrochen.' 
+              })
+            }
+          }
+        }
       } else {
         const { error } = await signUp(email, password)
         if (error) throw error

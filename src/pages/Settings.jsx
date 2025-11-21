@@ -84,7 +84,7 @@ export default function Settings() {
     setMessage({ type: '', text: '' })
 
     try {
-      // Markiere Account als gelöscht (Soft-Delete)
+      // Markiere Account zum Löschen (Soft-Delete)
       const { error } = await supabase
         .from('profiles')
         .update({ 
@@ -96,14 +96,14 @@ export default function Settings() {
 
       setMessage({ 
         type: 'success', 
-        text: 'Account wird in 30 Tagen gelöscht. Bei erneutem Login wird die Löschung abgebrochen.' 
+        text: 'Account zur Löschung markiert. Dein Account wird in 30 Tagen endgültig gelöscht. Du kannst die Löschung jederzeit durch erneutes Einloggen abbrechen!' 
       })
       
       setTimeout(async () => {
         await signOut()
-      }, 3000)
+      }, 4000)
     } catch (error) {
-      setMessage({ type: 'error', text: 'Fehler beim Löschen: ' + error.message })
+      setMessage({ type: 'error', text: 'Fehler beim Markieren: ' + error.message })
       setLoading(false)
     }
   }
@@ -334,8 +334,8 @@ export default function Settings() {
                       <line x1="12" y1="17" x2="12.01" y2="17"></line>
                     </svg>
                   </div>
-                  <h3>Account wirklich löschen?</h3>
-                  <p>Diese Aktion kann nicht rückgängig gemacht werden. Alle deine Habits und Statistiken werden permanent gelöscht.</p>
+                  <h3>Account zur Löschung markieren?</h3>
+                  <p>Dein Account wird in 30 Tagen endgültig gelöscht. Alle deine Ziele und Daten werden dann permanent entfernt. Du kannst die Löschung innerhalb der 30 Tage durch erneutes Einloggen abbrechen.</p>
                   <div className="button-group">
                     <button
                       onClick={handleDeleteAccount}
