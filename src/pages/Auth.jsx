@@ -275,7 +275,7 @@ export default function Auth() {
                 <span className="checkbox-text">
                   Ich akzeptiere die{' '}
                   <a 
-                    href="https://mrowinski-thorge.github.io/pathly.com/nutzungsbedingungen" 
+                    href="https://mrowinski-thorge.github.io/Pathly.com/nutzungsbedingungen" 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="terms-link"
