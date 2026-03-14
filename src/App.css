@@ -107,3 +107,32 @@ body.dark-mode .form-input::placeholder { color: rgba(255, 255, 255, 0.3); }
   color: #16a34a;
 }
 body.dark-mode .alert-success { color: #4ade80; }
+
+/* ── Deletion Modal ────────────────────────────────────────── */
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(0,0,0,.5);
+  backdrop-filter: blur(8px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.modal-card {
+  width: 100%; max-width: 360px;
+  padding: 32px 28px; text-align: center;
+  animation: fadeUp .25s ease;
+}
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(14px); }
+  to   { opacity:1; transform:none; }
+}
+.modal-warning-icon {
+  width: 52px; height: 52px; border-radius: 50%;
+  background: rgba(220,38,38,.12);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 18px;
+}
+.modal-warning-icon svg { width: 26px; height: 26px; color: #dc2626; }
+.modal-card h2 { font-size: 1.1rem; font-weight: 700; margin-bottom: 10px; }
+.modal-card p  { font-size: .9rem; color: rgba(0,0,0,.6); margin-bottom: 24px; line-height: 1.5; }
+body.dark-mode .modal-card p { color: rgba(255,255,255,.6); }
+.modal-actions { display: flex; flex-direction: column; gap: 10px; }

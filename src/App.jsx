@@ -1,82 +1,98 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
-import { AuthProvider, useAuth } from './AuthContext'
+import { AppProvider, useApp } from './AppContext'
 import Auth from './pages/Auth'
+import Onboarding from './pages/Onboarding'
 import Home from './pages/Home'
 import Settings from './pages/Settings'
-import Onboarding from './pages/Onboarding'
 import BottomNav from './components/BottomNav'
-import DeletionModal from './components/DeletionModal'
 import './App.css'
 
-/** Spinner while session is resolving */
-function Spinner() {
+/* ── Deletion-Restoration Modal ─────────────────────────────── */
+function DeletionModal() {
+  const { profile, t, lang, restoreAccount, keepAndSignOut } = useApp()
+  if (!profile?.deleted_at) return null
+
+  const d = new Date(profile.deleted_at)
+  d.setDate(d.getDate() + 30)
+  const formatted = d.toLocaleDateString(lang === 'en' ? 'en-GB' : 'de-DE', {
+    day: '2-digit', month: '2-digit', year: 'numeric'
+  })
+
   return (
-    <div className="loading-container">
-      <div className="spinner" />
+    <div className="modal-backdrop">
+      <div className="modal-card card">
+        <div className="modal-warning-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </div>
+        <h2>{t.restorationTitle}</h2>
+        <p>{t.restorationText(formatted)}</p>
+        <div className="modal-actions">
+          <button className="btn btn-primary" onClick={restoreAccount}>{t.restore}</button>
+          <button className="btn btn-secondary" onClick={keepAndSignOut}>{t.keepDeleting}</button>
+        </div>
+      </div>
     </div>
   )
 }
 
-/** Guards routes that need a logged-in + onboarded user */
-function RequireAuth({ children }) {
-  const { user, loading, profile } = useAuth()
-  if (loading) return <Spinner />
+/* ── Route guard ─────────────────────────────────────────────── */
+function ProtectedRoute({ children }) {
+  const { user, profile, loading } = useApp()
+  if (loading) return <div className="loading-container"><div className="spinner" /></div>
   if (!user) return <Navigate to="/auth" replace />
-  if (profile !== null && !profile.onboarding_done) return <Navigate to="/onboarding" replace />
+  if (profile && !profile.onboarding_done) return <Navigate to="/onboarding" replace />
   return children
 }
 
-const NAV_PATHS = ['/', '/settings']
-
-function AppRoutes() {
-  const { user, loading, profile } = useAuth()
+/* ── Layout ──────────────────────────────────────────────────── */
+function AppLayout({ children }) {
   const location = useLocation()
-
-  if (loading) return <Spinner />
-
-  const showNav = !!user && !!profile?.onboarding_done && NAV_PATHS.includes(location.pathname)
+  const { user, profile } = useApp()
+  const showNav = !!user && !!profile?.onboarding_done
+    && location.pathname !== '/auth'
+    && location.pathname !== '/onboarding'
 
   return (
     <>
-      {/* Deletion restore modal – shown globally whenever account is marked */}
-      {user && profile?.deleted_at && <DeletionModal />}
-
-      <Routes>
-        {/* Public */}
-        <Route path="/auth" element={user ? <Navigate to="/" replace /> : <Auth />} />
-
-        {/* Onboarding – only for logged-in users who haven't completed it */}
-        <Route
-          path="/onboarding"
-          element={
-            !user ? (
-              <Navigate to="/auth" replace />
-            ) : profile?.onboarding_done ? (
-              <Navigate to="/" replace />
-            ) : (
-              <Onboarding />
-            )
-          }
-        />
-
-        {/* Protected */}
-        <Route path="/" element={<RequireAuth><Home /></RequireAuth>} />
-        <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />
-
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-
+      <DeletionModal />
+      {children}
       {showNav && <BottomNav />}
     </>
   )
 }
 
+/* ── Routes ──────────────────────────────────────────────────── */
+function AppRoutes() {
+  const { user, profile, loading } = useApp()
+  if (loading) return <div className="loading-container"><div className="spinner" /></div>
+
+  return (
+    <AppLayout>
+      <Routes>
+        <Route path="/auth"
+          element={user && profile?.onboarding_done ? <Navigate to="/" replace /> : <Auth />}
+        />
+        <Route path="/onboarding"
+          element={!user ? <Navigate to="/auth" replace /> : <Onboarding />}
+        />
+        <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </AppLayout>
+  )
+}
+
 export default function App() {
   return (
-    <AuthProvider>
+    <AppProvider>
       <BrowserRouter basename="/Pathly.app">
         <AppRoutes />
       </BrowserRouter>
-    </AuthProvider>
+    </AppProvider>
   )
 }
