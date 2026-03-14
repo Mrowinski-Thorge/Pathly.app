@@ -280,3 +280,24 @@ body.dark-mode .checkbox-text {
 body.dark-mode .terms-link {
   color: white;
 }
+
+.captcha-wrapper {
+  margin-bottom: 16px;
+}
+
+.turnstile-box {
+  display: flex;
+  justify-content: center;
+  min-height: 65px;
+}
+
+.captcha-status {
+  margin-top: 8px;
+  text-align: center;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+body.dark-mode .captcha-status {
+  color: rgba(255, 255, 255, 0.6);
+}

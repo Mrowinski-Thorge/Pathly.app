@@ -46,29 +46,36 @@ export const AuthProvider = ({ children }) => {
     return () => subscription.unsubscribe()
   }, [])
 
-  const signUp = async (email, password) => {
-    const { data, error } = await supabase.auth.signUp({
+  const signUp = async (email, password, captchaToken) => {
+    const payload = {
       email,
       password
-    })
+    }
+
+    if (captchaToken) {
+      payload.options = {
+        captchaToken
+      }
+    }
+
+    const { data, error } = await supabase.auth.signUp(payload)
     return { data, error }
   }
 
-  const signIn = async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
+  const signIn = async (email, password, captchaToken) => {
+    const payload = {
       email,
       password
-    })
-    
-    // Reaktiviere Account wenn er zum Löschen markiert war
-    if (data?.user) {
-      await supabase
-        .from('profiles')
-        .update({ deleted_at: null })
-        .eq('id', data.user.id)
-        .is('deleted_at', 'not.null')
     }
-    
+
+    if (captchaToken) {
+      payload.options = {
+        captchaToken
+      }
+    }
+
+    const { data, error } = await supabase.auth.signInWithPassword(payload)
+
     return { data, error }
   }
 

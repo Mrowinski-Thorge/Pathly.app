@@ -1,7 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../AuthContext'
 import { supabase } from '../supabaseClient'
+import { turnstileSiteKey } from '../supabaseClient'
 import './Auth.css'
+
+const TURNSTILE_SCRIPT_ID = 'cf-turnstile-script'
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true)
@@ -11,6 +14,12 @@ export default function Auth() {
   const [message, setMessage] = useState({ type: '', text: '' })
   const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [showPasswordReset, setShowPasswordReset] = useState(false)
+  const [isDarkMode, setIsDarkMode] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState('')
+  const [captchaReady, setCaptchaReady] = useState(false)
+
+  const turnstileContainerRef = useRef(null)
+  const turnstileWidgetIdRef = useRef(null)
 
   const { signIn, signUp } = useAuth()
 
@@ -22,6 +31,9 @@ export default function Auth() {
     
     if (theme === 'dark') {
       document.body.classList.add('dark-mode')
+      setIsDarkMode(true)
+    } else {
+      setIsDarkMode(false)
     }
   }, [])
 
@@ -30,20 +42,105 @@ export default function Auth() {
     if (isDark) {
       document.body.classList.remove('dark-mode')
       localStorage.setItem('theme', 'light')
+      setIsDarkMode(false)
     } else {
       document.body.classList.add('dark-mode')
       localStorage.setItem('theme', 'dark')
+      setIsDarkMode(true)
+    }
+  }
+
+  const renderTurnstile = useCallback(() => {
+    if (!window.turnstile || !turnstileContainerRef.current) {
+      return
+    }
+
+    if (turnstileWidgetIdRef.current !== null) {
+      window.turnstile.remove(turnstileWidgetIdRef.current)
+      turnstileWidgetIdRef.current = null
+    }
+
+    turnstileContainerRef.current.innerHTML = ''
+
+    turnstileWidgetIdRef.current = window.turnstile.render(turnstileContainerRef.current, {
+      sitekey: turnstileSiteKey,
+      theme: isDarkMode ? 'dark' : 'light',
+      callback: (token) => {
+        setCaptchaToken(token)
+      },
+      'expired-callback': () => {
+        setCaptchaToken('')
+      },
+      'error-callback': () => {
+        setCaptchaToken('')
+        setMessage({ type: 'error', text: 'Captcha fehlgeschlagen. Bitte erneut versuchen.' })
+      }
+    })
+
+    setCaptchaReady(true)
+  }, [isDarkMode])
+
+  useEffect(() => {
+    if (window.turnstile) {
+      renderTurnstile()
+      return
+    }
+
+    const existingScript = document.getElementById(TURNSTILE_SCRIPT_ID)
+
+    if (existingScript) {
+      existingScript.addEventListener('load', renderTurnstile)
+
+      return () => {
+        existingScript.removeEventListener('load', renderTurnstile)
+      }
+    }
+
+    const script = document.createElement('script')
+    script.id = TURNSTILE_SCRIPT_ID
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
+    script.async = true
+    script.defer = true
+    script.onload = renderTurnstile
+    document.head.appendChild(script)
+
+    return () => {
+      script.onload = null
+    }
+  }, [renderTurnstile])
+
+  useEffect(() => {
+    setCaptchaToken('')
+    setCaptchaReady(false)
+
+    if (window.turnstile) {
+      renderTurnstile()
+    }
+  }, [isLogin, showPasswordReset, isDarkMode, renderTurnstile])
+
+  const resetCaptcha = () => {
+    setCaptchaToken('')
+
+    if (window.turnstile && turnstileWidgetIdRef.current !== null) {
+      window.turnstile.reset(turnstileWidgetIdRef.current)
     }
   }
 
   const handlePasswordReset = async (e) => {
     e.preventDefault()
+
+    if (!captchaToken) {
+      setMessage({ type: 'error', text: 'Bitte bestätige zuerst das Captcha' })
+      return
+    }
+
     setLoading(true)
     setMessage({ type: '', text: '' })
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/pathly.app/auth`
+        redirectTo: `${window.location.origin}/Pathly.app/auth`,
+        captchaToken
       })
       if (error) throw error
       
@@ -55,6 +152,7 @@ export default function Auth() {
     } catch (error) {
       setMessage({ type: 'error', text: error.message })
     } finally {
+      resetCaptcha()
       setLoading(false)
     }
   }
@@ -68,39 +166,20 @@ export default function Auth() {
       return
     }
 
+    if (!captchaToken) {
+      setMessage({ type: 'error', text: 'Bitte bestätige zuerst das Captcha' })
+      return
+    }
+
     setLoading(true)
     setMessage({ type: '', text: '' })
 
     try {
       if (isLogin) {
-        const { data: authData, error: signInError } = await signIn(email, password)
+        const { error: signInError } = await signIn(email, password, captchaToken)
         if (signInError) throw signInError
-
-        // Prüfe ob Account zum Löschen markiert ist
-        if (authData?.user) {
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('deleted_at')
-            .eq('id', authData.user.id)
-            .single()
-
-          // Wenn deleted_at gesetzt ist, entferne es (Löschung abbrechen)
-          if (profile?.deleted_at) {
-            const { error: updateError } = await supabase
-              .from('profiles')
-              .update({ deleted_at: null })
-              .eq('id', authData.user.id)
-
-            if (!updateError) {
-              setMessage({ 
-                type: 'success', 
-                text: '✅ Willkommen zurück! Die Löschung deines Accounts wurde abgebrochen.' 
-              })
-            }
-          }
-        }
       } else {
-        const { error } = await signUp(email, password)
+        const { error } = await signUp(email, password, captchaToken)
         if (error) throw error
         setMessage({ 
           type: 'success', 
@@ -110,6 +189,7 @@ export default function Auth() {
     } catch (error) {
       setMessage({ type: 'error', text: error.message })
     } finally {
+      resetCaptcha()
       setLoading(false)
     }
   }
@@ -162,6 +242,11 @@ export default function Auth() {
               />
             </div>
 
+            <div className="captcha-wrapper">
+              <div ref={turnstileContainerRef} className="turnstile-box" />
+              {!captchaReady && <p className="captcha-status">Captcha wird geladen...</p>}
+            </div>
+
             <button 
               type="submit" 
               className="btn btn-primary btn-full"
@@ -178,6 +263,7 @@ export default function Auth() {
               onClick={() => {
                 setShowPasswordReset(false)
                 setMessage({ type: '', text: '' })
+                resetCaptcha()
               }}
             >
               Zurück zur Anmeldung
@@ -256,7 +342,11 @@ export default function Auth() {
               <button
                 type="button"
                 className="link-button-small"
-                onClick={() => setShowPasswordReset(true)}
+                onClick={() => {
+                  setShowPasswordReset(true)
+                  setMessage({ type: '', text: '' })
+                  resetCaptcha()
+                }}
               >
                 Passwort vergessen?
               </button>
@@ -287,6 +377,11 @@ export default function Auth() {
             </div>
           )}
 
+          <div className="captcha-wrapper">
+            <div ref={turnstileContainerRef} className="turnstile-box" />
+            {!captchaReady && <p className="captcha-status">Captcha wird geladen...</p>}
+          </div>
+
           <button 
             type="submit" 
             className="btn btn-primary btn-full"
@@ -304,6 +399,7 @@ export default function Auth() {
               setIsLogin(!isLogin)
               setMessage({ type: '', text: '' })
               setAcceptedTerms(false)
+              resetCaptcha()
             }}
           >
             {isLogin 

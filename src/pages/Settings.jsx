@@ -14,6 +14,8 @@ export default function Settings() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState({ type: '', text: '' })
   const [isDarkMode, setIsDarkMode] = useState(false)
+  const [isDeletionScheduled, setIsDeletionScheduled] = useState(false)
+  const [deletionDate, setDeletionDate] = useState(null)
 
   // Theme management
   useEffect(() => {
@@ -26,6 +28,36 @@ export default function Settings() {
       setIsDarkMode(true)
     }
   }, [])
+
+  useEffect(() => {
+    if (user?.id) {
+      loadDeletionStatus()
+    }
+  }, [user?.id])
+
+  const loadDeletionStatus = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('deleted_at')
+        .eq('id', user.id)
+        .maybeSingle()
+
+      if (error && error.code !== 'PGRST116') {
+        throw error
+      }
+
+      if (data?.deleted_at) {
+        setIsDeletionScheduled(true)
+        setDeletionDate(data.deleted_at)
+      } else {
+        setIsDeletionScheduled(false)
+        setDeletionDate(null)
+      }
+    } catch (error) {
+      console.error('Fehler beim Laden des Loeschstatus:', error)
+    }
+  }
 
   const toggleTheme = () => {
     const isDark = document.body.classList.contains('dark-mode')
@@ -84,29 +116,73 @@ export default function Settings() {
     setMessage({ type: '', text: '' })
 
     try {
-      // Markiere Account zum Löschen (Soft-Delete)
+      const now = new Date().toISOString()
+
+      // Markiere Account zum Loeschen (Soft-Delete)
       const { error } = await supabase
         .from('profiles')
-        .update({ 
-          deleted_at: new Date().toISOString()
+        .upsert(
+          {
+            id: user.id,
+            deleted_at: now,
+            updated_at: now
+          },
+          { onConflict: 'id' }
+        )
+
+      if (error) throw error
+
+      setIsDeletionScheduled(true)
+      setDeletionDate(now)
+
+      setMessage({ 
+        type: 'success', 
+        text: 'Account zur Loeschung markiert. Dein Account wird in 30 Tagen endgueltig geloescht.' 
+      })
+      
+      setTimeout(async () => {
+        await signOut()
+      }, 2500)
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Fehler beim Markieren: ' + error.message })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCancelScheduledDeletion = async () => {
+    setLoading(true)
+    setMessage({ type: '', text: '' })
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          deleted_at: null,
+          updated_at: new Date().toISOString()
         })
         .eq('id', user.id)
 
       if (error) throw error
 
-      setMessage({ 
-        type: 'success', 
-        text: 'Account zur Löschung markiert. Dein Account wird in 30 Tagen endgültig gelöscht. Du kannst die Löschung jederzeit durch erneutes Einloggen abbrechen!' 
-      })
-      
-      setTimeout(async () => {
-        await signOut()
-      }, 4000)
+      setIsDeletionScheduled(false)
+      setDeletionDate(null)
+      setShowDeleteConfirm(false)
+      setMessage({ type: 'success', text: 'Die geplante Loeschung wurde abgebrochen.' })
     } catch (error) {
-      setMessage({ type: 'error', text: 'Fehler beim Markieren: ' + error.message })
+      setMessage({ type: 'error', text: 'Fehler beim Abbrechen: ' + error.message })
+    } finally {
       setLoading(false)
     }
   }
+
+  const formattedDeletionDate = deletionDate
+    ? new Date(deletionDate).toLocaleDateString('de-DE', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      })
+    : null
 
   return (
     <div className="settings-container">
@@ -315,14 +391,18 @@ export default function Settings() {
                     </div>
                     <div className="setting-text">
                       <h3>Account löschen</h3>
-                      <p>Alle deine Daten werden unwiderruflich gelöscht</p>
+                      <p>
+                        {isDeletionScheduled
+                          ? `Zur Loeschung markiert seit ${formattedDeletionDate}`
+                          : 'Alle deine Daten werden unwiderruflich geloescht'}
+                      </p>
                     </div>
                   </div>
                   <button 
                     onClick={() => setShowDeleteConfirm(true)} 
                     className="btn btn-danger"
                   >
-                    Löschen
+                    {isDeletionScheduled ? 'Status ansehen' : 'Löschen'}
                   </button>
                 </div>
               ) : (
@@ -334,16 +414,37 @@ export default function Settings() {
                       <line x1="12" y1="17" x2="12.01" y2="17"></line>
                     </svg>
                   </div>
-                  <h3>Account zur Löschung markieren?</h3>
-                  <p>Dein Account wird in 30 Tagen endgültig gelöscht. Alle deine Ziele und Daten werden dann permanent entfernt. Du kannst die Löschung innerhalb der 30 Tage durch erneutes Einloggen abbrechen.</p>
+                  <h3>
+                    {isDeletionScheduled
+                      ? 'Löschung bereits geplant'
+                      : 'Account zur Löschung markieren?'}
+                  </h3>
+                  <p>
+                    {isDeletionScheduled
+                      ? 'Dein Account ist bereits zur Loeschung markiert. Du kannst den Vorgang jetzt abbrechen oder weiter aktiv lassen.'
+                      : 'Dein Account wird in 30 Tagen endgueltig geloescht. Alle deine Ziele und Daten werden dann permanent entfernt.'}
+                  </p>
                   <div className="button-group">
-                    <button
-                      onClick={handleDeleteAccount}
-                      className="btn btn-danger"
-                      disabled={loading}
-                    >
-                      {loading ? 'Wird gelöscht...' : 'Ja, Account löschen'}
-                    </button>
+                    {!isDeletionScheduled && (
+                      <button
+                        onClick={handleDeleteAccount}
+                        className="btn btn-danger"
+                        disabled={loading}
+                      >
+                        {loading ? 'Wird markiert...' : 'Ja, zur Löschung markieren'}
+                      </button>
+                    )}
+
+                    {isDeletionScheduled && (
+                      <button
+                        onClick={handleCancelScheduledDeletion}
+                        className="btn btn-primary"
+                        disabled={loading}
+                      >
+                        {loading ? 'Wird abgebrochen...' : 'Löschung abbrechen'}
+                      </button>
+                    )}
+
                     <button
                       onClick={() => setShowDeleteConfirm(false)}
                       className="btn btn-secondary"
