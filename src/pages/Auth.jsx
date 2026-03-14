@@ -1,413 +1,258 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../AuthContext'
-import { supabase } from '../supabaseClient'
 import { turnstileSiteKey } from '../supabaseClient'
+import { useT } from '../useT'
 import './Auth.css'
 
-const TURNSTILE_SCRIPT_ID = 'cf-turnstile-script'
+const SCRIPT_ID = 'cf-turnstile-script'
 
 export default function Auth() {
-  const [isLogin, setIsLogin] = useState(true)
+  // view: 'login' | 'register' | 'reset' | 'verify'
+  const [view, setView] = useState('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState({ type: '', text: '' })
+  const [msg, setMsg] = useState({ type: '', text: '' })
   const [acceptedTerms, setAcceptedTerms] = useState(false)
-  const [showPasswordReset, setShowPasswordReset] = useState(false)
-  const [isDarkMode, setIsDarkMode] = useState(false)
   const [captchaToken, setCaptchaToken] = useState('')
   const [captchaReady, setCaptchaReady] = useState(false)
+  const [isDark, setIsDark] = useState(() => document.body.classList.contains('dark-mode'))
 
-  const turnstileContainerRef = useRef(null)
-  const turnstileWidgetIdRef = useRef(null)
+  const containerRef = useRef(null)
+  const widgetRef = useRef(null)
+  const { signIn, signUp, resetPasswordForEmail } = useAuth()
+  const t = useT()
 
-  const { signIn, signUp } = useAuth()
-
-  // Theme management
-  useEffect(() => {
-    const savedTheme = localStorage.getItem('theme')
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    const theme = savedTheme || (prefersDark ? 'dark' : 'light')
-    
-    if (theme === 'dark') {
-      document.body.classList.add('dark-mode')
-      setIsDarkMode(true)
-    } else {
-      setIsDarkMode(false)
-    }
-  }, [])
-
+  // ── Theme toggle (auth page only – user not logged in) ───────────────────
   const toggleTheme = () => {
-    const isDark = document.body.classList.contains('dark-mode')
-    if (isDark) {
-      document.body.classList.remove('dark-mode')
-      localStorage.setItem('theme', 'light')
-      setIsDarkMode(false)
-    } else {
-      document.body.classList.add('dark-mode')
-      localStorage.setItem('theme', 'dark')
-      setIsDarkMode(true)
+    const dark = document.body.classList.toggle('dark-mode')
+    setIsDark(dark)
+    try { localStorage.setItem('theme', dark ? 'dark' : 'light') } catch (_) {}
+    // re-render turnstile with correct theme
+    if (window.turnstile && widgetRef.current != null) {
+      window.turnstile.remove(widgetRef.current)
+      widgetRef.current = null
+      setCaptchaToken('')
+      setCaptchaReady(false)
     }
   }
 
+  // ── Turnstile ─────────────────────────────────────────────────────────────
   const renderTurnstile = useCallback(() => {
-    if (!window.turnstile || !turnstileContainerRef.current) {
-      return
+    if (!window.turnstile || !containerRef.current) return
+    if (widgetRef.current != null) {
+      window.turnstile.remove(widgetRef.current)
+      widgetRef.current = null
     }
-
-    if (turnstileWidgetIdRef.current !== null) {
-      window.turnstile.remove(turnstileWidgetIdRef.current)
-      turnstileWidgetIdRef.current = null
-    }
-
-    turnstileContainerRef.current.innerHTML = ''
-
-    turnstileWidgetIdRef.current = window.turnstile.render(turnstileContainerRef.current, {
+    containerRef.current.innerHTML = ''
+    widgetRef.current = window.turnstile.render(containerRef.current, {
       sitekey: turnstileSiteKey,
-      theme: isDarkMode ? 'dark' : 'light',
-      callback: (token) => {
-        setCaptchaToken(token)
-      },
-      'expired-callback': () => {
-        setCaptchaToken('')
-      },
+      theme: document.body.classList.contains('dark-mode') ? 'dark' : 'light',
+      callback: (token) => setCaptchaToken(token),
+      'expired-callback': () => setCaptchaToken(''),
       'error-callback': () => {
         setCaptchaToken('')
-        setMessage({ type: 'error', text: 'Captcha fehlgeschlagen. Bitte erneut versuchen.' })
-      }
+        setMsg({ type: 'error', text: t('captchaFailed') })
+      },
     })
-
     setCaptchaReady(true)
-  }, [isDarkMode])
+  }, [isDark]) // eslint-disable-line
 
   useEffect(() => {
-    if (window.turnstile) {
-      renderTurnstile()
-      return
-    }
+    if (view === 'verify') return
+    if (window.turnstile) { renderTurnstile(); return }
+    const existing = document.getElementById(SCRIPT_ID)
+    if (existing) { existing.addEventListener('load', renderTurnstile); return () => existing.removeEventListener('load', renderTurnstile) }
+    const s = document.createElement('script')
+    s.id = SCRIPT_ID
+    s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
+    s.async = true
+    s.defer = true
+    s.onload = renderTurnstile
+    document.head.appendChild(s)
+  }, [renderTurnstile, view])
 
-    const existingScript = document.getElementById(TURNSTILE_SCRIPT_ID)
-
-    if (existingScript) {
-      existingScript.addEventListener('load', renderTurnstile)
-
-      return () => {
-        existingScript.removeEventListener('load', renderTurnstile)
-      }
-    }
-
-    const script = document.createElement('script')
-    script.id = TURNSTILE_SCRIPT_ID
-    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
-    script.async = true
-    script.defer = true
-    script.onload = renderTurnstile
-    document.head.appendChild(script)
-
-    return () => {
-      script.onload = null
-    }
-  }, [renderTurnstile])
-
+  // reset widget on view change
   useEffect(() => {
+    if (view === 'verify') return
     setCaptchaToken('')
     setCaptchaReady(false)
-
-    if (window.turnstile) {
-      renderTurnstile()
-    }
-  }, [isLogin, showPasswordReset, isDarkMode, renderTurnstile])
+    if (window.turnstile) renderTurnstile()
+  }, [view]) // eslint-disable-line
 
   const resetCaptcha = () => {
     setCaptchaToken('')
-
-    if (window.turnstile && turnstileWidgetIdRef.current !== null) {
-      window.turnstile.reset(turnstileWidgetIdRef.current)
-    }
+    if (window.turnstile && widgetRef.current != null) window.turnstile.reset(widgetRef.current)
   }
 
-  const handlePasswordReset = async (e) => {
+  // ── Handlers ──────────────────────────────────────────────────────────────
+  const handleAuth = async (e) => {
     e.preventDefault()
-
-    if (!captchaToken) {
-      setMessage({ type: 'error', text: 'Bitte bestätige zuerst das Captcha' })
-      return
-    }
-
-    setLoading(true)
-    setMessage({ type: '', text: '' })
-
+    if (!captchaToken) { setMsg({ type: 'error', text: t('captchaRequired') }); return }
+    if (view === 'register' && !acceptedTerms) { setMsg({ type: 'error', text: t('termsRequired') }); return }
+    setLoading(true); setMsg({ type: '', text: '' })
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/Pathly.app/auth`,
-        captchaToken
-      })
-      if (error) throw error
-      
-      setMessage({ 
-        type: 'success', 
-        text: 'Passwort-Reset-Link wurde an deine E-Mail gesendet.' 
-      })
-      setShowPasswordReset(false)
-    } catch (error) {
-      setMessage({ type: 'error', text: error.message })
-    } finally {
-      resetCaptcha()
-      setLoading(false)
-    }
-  }
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    
-    // Bei Registrierung müssen Nutzungsbedingungen akzeptiert werden
-    if (!isLogin && !acceptedTerms) {
-      setMessage({ type: 'error', text: 'Bitte akzeptiere die Nutzungsbedingungen' })
-      return
-    }
-
-    if (!captchaToken) {
-      setMessage({ type: 'error', text: 'Bitte bestätige zuerst das Captcha' })
-      return
-    }
-
-    setLoading(true)
-    setMessage({ type: '', text: '' })
-
-    try {
-      if (isLogin) {
-        const { error: signInError } = await signIn(email, password, captchaToken)
-        if (signInError) throw signInError
+      if (view === 'login') {
+        const { error } = await signIn(email, password, captchaToken)
+        if (error) throw error
+        // AuthContext / App.jsx will redirect automatically
       } else {
         const { error } = await signUp(email, password, captchaToken)
         if (error) throw error
-        setMessage({ 
-          type: 'success', 
-          text: 'Registrierung erfolgreich! Bitte überprüfe deine E-Mail.' 
-        })
+        setView('verify')
       }
-    } catch (error) {
-      setMessage({ type: 'error', text: error.message })
+    } catch (err) {
+      setMsg({ type: 'error', text: err.message })
     } finally {
       resetCaptcha()
       setLoading(false)
     }
   }
 
-  if (showPasswordReset) {
-    return (
-      <div className="auth-container">
-        <button onClick={toggleTheme} className="theme-toggle-floating" aria-label="Theme umschalten">
-          <svg className="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="5"></circle>
-            <line x1="12" y1="1" x2="12" y2="3"></line>
-            <line x1="12" y1="21" x2="12" y2="23"></line>
-            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-            <line x1="1" y1="12" x2="3" y2="12"></line>
-            <line x1="21" y1="12" x2="23" y2="12"></line>
-            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-          </svg>
-          <svg className="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-          </svg>
-        </button>
+  const handleReset = async (e) => {
+    e.preventDefault()
+    if (!captchaToken) { setMsg({ type: 'error', text: t('captchaRequired') }); return }
+    setLoading(true); setMsg({ type: '', text: '' })
+    try {
+      const { error } = await resetPasswordForEmail(email, captchaToken)
+      if (error) throw error
+      setMsg({ type: 'success', text: t('resetSuccess') })
+    } catch (err) {
+      setMsg({ type: 'error', text: err.message })
+    } finally {
+      resetCaptcha()
+      setLoading(false)
+    }
+  }
 
+  const goTo = (v) => { setView(v); setMsg({ type: '', text: '' }); setAcceptedTerms(false) }
+
+  // ── Verification screen ───────────────────────────────────────────────────
+  if (view === 'verify') {
+    return (
+      <div className="auth-page">
+        <ThemeBtn isDark={isDark} onToggle={toggleTheme} />
+        <div className="auth-card card">
+          <div className="auth-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          </div>
+          <h1>{t('verifyTitle')}</h1>
+          <p className="auth-subtitle">{t('verifyText')}</p>
+          <p className="auth-hint">{t('verifyHint')}</p>
+          <button className="btn btn-primary btn-full" style={{marginTop: 24}} onClick={() => goTo('login')}>
+            {t('backToLogin')}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Password reset screen ─────────────────────────────────────────────────
+  if (view === 'reset') {
+    return (
+      <div className="auth-page">
+        <ThemeBtn isDark={isDark} onToggle={toggleTheme} />
         <div className="auth-card card">
           <div className="auth-header">
-            <h1>Passwort zurücksetzen</h1>
-            <p>Gib deine E-Mail ein, um einen Reset-Link zu erhalten</p>
+            <h1>{t('resetTitle')}</h1>
+            <p className="auth-subtitle">{t('resetSubtitle')}</p>
           </div>
-
-          {message.text && (
-            <div className={`alert alert-${message.type}`}>
-              {message.text}
-            </div>
-          )}
-
-          <form onSubmit={handlePasswordReset} className="auth-form">
+          {msg.text && <div className={`alert alert-${msg.type}`}>{msg.text}</div>}
+          <form onSubmit={handleReset}>
             <div className="form-group">
-              <label htmlFor="email" className="form-label">
-                E-Mail
-              </label>
-              <input
-                id="email"
-                type="email"
-                className="form-input"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                placeholder="deine@email.de"
-              />
+              <label className="form-label">{t('email')}</label>
+              <input type="email" className="form-input" value={email} onChange={e => setEmail(e.target.value)} required placeholder={t('emailPlaceholder')} />
             </div>
-
-            <div className="captcha-wrapper">
-              <div ref={turnstileContainerRef} className="turnstile-box" />
-              {!captchaReady && <p className="captcha-status">Captcha wird geladen...</p>}
+            <div className="captcha-wrap">
+              <div ref={containerRef} />
+              {!captchaReady && <p className="captcha-hint">Captcha wird geladen…</p>}
             </div>
-
-            <button 
-              type="submit" 
-              className="btn btn-primary btn-full"
-              disabled={loading}
-            >
-              {loading ? 'Senden...' : 'Reset-Link senden'}
+            <button type="submit" className="btn btn-primary btn-full" disabled={loading}>
+              {loading ? t('sending') : t('sendResetLink')}
             </button>
           </form>
-
           <div className="auth-footer">
-            <button
-              type="button"
-              className="link-button"
-              onClick={() => {
-                setShowPasswordReset(false)
-                setMessage({ type: '', text: '' })
-                resetCaptcha()
-              }}
-            >
-              Zurück zur Anmeldung
-            </button>
+            <button className="link-btn" onClick={() => goTo('login')}>{t('backToLogin')}</button>
           </div>
         </div>
       </div>
     )
   }
 
+  // ── Login / Register ──────────────────────────────────────────────────────
   return (
-    <div className="auth-container">
-      <button onClick={toggleTheme} className="theme-toggle-floating" aria-label="Theme umschalten">
-        <svg className="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="12" cy="12" r="5"></circle>
-          <line x1="12" y1="1" x2="12" y2="3"></line>
-          <line x1="12" y1="21" x2="12" y2="23"></line>
-          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-          <line x1="1" y1="12" x2="3" y2="12"></line>
-          <line x1="21" y1="12" x2="23" y2="12"></line>
-          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-        </svg>
-        <svg className="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-        </svg>
-      </button>
-
+    <div className="auth-page">
+      <ThemeBtn isDark={isDark} onToggle={toggleTheme} />
       <div className="auth-card card">
         <div className="auth-header">
-          <h1>Pathly App</h1>
-          <p>{isLogin ? 'Willkommen zurück' : 'Erstelle dein Konto'}</p>
+          <h1>{t('appName')}</h1>
+          <p className="auth-subtitle">{view === 'login' ? t('welcomeBack') : t('createAccount')}</p>
         </div>
 
-        {message.text && (
-          <div className={`alert alert-${message.type}`}>
-            {message.text}
-          </div>
-        )}
+        {msg.text && <div className={`alert alert-${msg.type}`}>{msg.text}</div>}
 
-        <form onSubmit={handleSubmit} className="auth-form">
+        <form onSubmit={handleAuth}>
           <div className="form-group">
-            <label htmlFor="email" className="form-label">
-              E-Mail
-            </label>
-            <input
-              id="email"
-              type="email"
-              className="form-input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              placeholder="deine@email.de"
-            />
+            <label className="form-label">{t('email')}</label>
+            <input type="email" className="form-input" value={email} onChange={e => setEmail(e.target.value)} required placeholder={t('emailPlaceholder')} />
           </div>
-
           <div className="form-group">
-            <label htmlFor="password" className="form-label">
-              Passwort
-            </label>
-            <input
-              id="password"
-              type="password"
-              className="form-input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              placeholder="••••••••"
-              minLength={6}
-            />
+            <label className="form-label">{t('password')}</label>
+            <input type="password" className="form-input" value={password} onChange={e => setPassword(e.target.value)} required placeholder={t('passwordPlaceholder')} minLength={6} />
           </div>
 
-          {isLogin && (
-            <div className="forgot-password-link">
-              <button
-                type="button"
-                className="link-button-small"
-                onClick={() => {
-                  setShowPasswordReset(true)
-                  setMessage({ type: '', text: '' })
-                  resetCaptcha()
-                }}
-              >
-                Passwort vergessen?
-              </button>
+          {view === 'login' && (
+            <div className="forgot-row">
+              <button type="button" className="link-btn-sm" onClick={() => goTo('reset')}>{t('forgotPassword')}</button>
             </div>
           )}
 
-          {!isLogin && (
-            <div className="terms-checkbox">
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={acceptedTerms}
-                  onChange={(e) => setAcceptedTerms(e.target.checked)}
-                  className="checkbox-input"
-                />
-                <span className="checkbox-text">
-                  Ich akzeptiere die{' '}
-                  <a 
-                    href="https://mrowinski-thorge.github.io/Pathly.com/nutzungsbedingungen" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="terms-link"
-                  >
-                    Nutzungsbedingungen
-                  </a>
-                </span>
-              </label>
-            </div>
+          {view === 'register' && (
+            <label className="terms-row">
+              <input type="checkbox" checked={acceptedTerms} onChange={e => setAcceptedTerms(e.target.checked)} />
+              <span>{t('acceptTermsPrefix')}{' '}
+                <a href="https://mrowinski-thorge.github.io/Pathly.com/nutzungsbedingungen" target="_blank" rel="noopener noreferrer" className="terms-link">
+                  {t('termsLink')}
+                </a>
+              </span>
+            </label>
           )}
 
-          <div className="captcha-wrapper">
-            <div ref={turnstileContainerRef} className="turnstile-box" />
-            {!captchaReady && <p className="captcha-status">Captcha wird geladen...</p>}
+          <div className="captcha-wrap">
+            <div ref={containerRef} />
+            {!captchaReady && <p className="captcha-hint">Captcha wird geladen…</p>}
           </div>
 
-          <button 
-            type="submit" 
-            className="btn btn-primary btn-full"
-            disabled={loading}
-          >
-            {loading ? 'Laden...' : isLogin ? 'Anmelden' : 'Registrieren'}
+          <button type="submit" className="btn btn-primary btn-full" disabled={loading}>
+            {loading ? t('loading') : view === 'login' ? t('loginBtn') : t('registerBtn')}
           </button>
         </form>
 
         <div className="auth-footer">
-          <button
-            type="button"
-            className="link-button"
-            onClick={() => {
-              setIsLogin(!isLogin)
-              setMessage({ type: '', text: '' })
-              setAcceptedTerms(false)
-              resetCaptcha()
-            }}
-          >
-            {isLogin 
-              ? 'Noch kein Konto? Jetzt registrieren' 
-              : 'Bereits registriert? Anmelden'}
+          <button className="link-btn" onClick={() => goTo(view === 'login' ? 'register' : 'login')}>
+            {view === 'login' ? t('noAccount') : t('hasAccount')}
           </button>
         </div>
       </div>
     </div>
+  )
+}
+
+function ThemeBtn({ isDark, onToggle }) {
+  return (
+    <button className="theme-toggle-btn" onClick={onToggle} aria-label="Theme umschalten">
+      {isDark ? (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+      ) : (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      )}
+    </button>
   )
 }

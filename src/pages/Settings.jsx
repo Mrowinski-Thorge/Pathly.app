@@ -1,464 +1,293 @@
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState } from 'react'
 import { useAuth } from '../AuthContext'
-import { supabase } from '../supabaseClient'
+import { useT } from '../useT'
 import './Settings.css'
 
+// ── Segmented Control ──────────────────────────────────────────────────────
+function Seg({ value, options, onChange }) {
+  return (
+    <div className="seg">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          className={`seg-btn${value === o.value ? ' active' : ''}`}
+          onClick={() => onChange(o.value)}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// ── Row components ─────────────────────────────────────────────────────────
+function Row({ icon, label, desc, children, danger }) {
+  return (
+    <div className={`s-row${danger ? ' s-row-danger' : ''}`}>
+      <div className={`s-icon${danger ? ' s-icon-danger' : ''}`}>{icon}</div>
+      <div className="s-info">
+        <span className="s-label">{label}</span>
+        {desc && <span className="s-desc">{desc}</span>}
+      </div>
+      {children && <div className="s-control">{children}</div>}
+    </div>
+  )
+}
+
+// ── Icons ──────────────────────────────────────────────────────────────────
+const IconPerson  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+const IconGlobe   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/></svg>
+const IconSun     = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+const IconMail    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+const IconLock    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+const IconLogout  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+const IconTrash   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+const IconWarn    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+
+// ─────────────────────────────────────────────────────────────────────────────
 export default function Settings() {
-  const { user, signOut, updatePassword } = useAuth()
-  const navigate = useNavigate()
-  const [showPasswordChange, setShowPasswordChange] = useState(false)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState({ type: '', text: '' })
-  const [isDarkMode, setIsDarkMode] = useState(false)
-  const [isDeletionScheduled, setIsDeletionScheduled] = useState(false)
-  const [deletionDate, setDeletionDate] = useState(null)
+  const { user, profile, signOut, updatePassword, verifyPassword, updateProfile, markForDeletion, cancelDeletion } = useAuth()
+  const t = useT()
 
-  // Theme management
-  useEffect(() => {
-    const savedTheme = localStorage.getItem('theme')
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    const theme = savedTheme || (prefersDark ? 'dark' : 'light')
-    
-    if (theme === 'dark') {
-      document.body.classList.add('dark-mode')
-      setIsDarkMode(true)
-    }
-  }, [])
+  const [msg, setMsg] = useState({ type: '', text: '' })
 
-  useEffect(() => {
-    if (user?.id) {
-      loadDeletionStatus()
-    }
-  }, [user?.id])
+  // Display name editing
+  const [editingName, setEditingName] = useState(false)
+  const [nameVal, setNameVal] = useState(profile?.display_name || '')
+  const [nameSaving, setNameSaving] = useState(false)
 
-  const loadDeletionStatus = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('deleted_at')
-        .eq('id', user.id)
-        .maybeSingle()
+  // Password change
+  const [editingPw, setEditingPw] = useState(false)
+  const [newPw, setNewPw] = useState('')
+  const [confirmPw, setConfirmPw] = useState('')
+  const [pwSaving, setPwSaving] = useState(false)
 
-      if (error && error.code !== 'PGRST116') {
-        throw error
-      }
+  // Delete flow
+  const [deleteStep, setDeleteStep] = useState(0) // 0=hidden, 1=form, 2=status
+  const [deletePw, setDeletePw] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [cancellingDeletion, setCancellingDeletion] = useState(false)
 
-      if (data?.deleted_at) {
-        setIsDeletionScheduled(true)
-        setDeletionDate(data.deleted_at)
-      } else {
-        setIsDeletionScheduled(false)
-        setDeletionDate(null)
-      }
-    } catch (error) {
-      console.error('Fehler beim Laden des Loeschstatus:', error)
-    }
-  }
-
-  const toggleTheme = () => {
-    const isDark = document.body.classList.contains('dark-mode')
-    if (isDark) {
-      document.body.classList.remove('dark-mode')
-      localStorage.setItem('theme', 'light')
-      setIsDarkMode(false)
-    } else {
-      document.body.classList.add('dark-mode')
-      localStorage.setItem('theme', 'dark')
-      setIsDarkMode(true)
-    }
-  }
-
-  const handleSignOut = async () => {
-    const { error } = await signOut()
-    if (error) {
-      setMessage({ type: 'error', text: error.message })
-    }
-  }
-
-  const handlePasswordChange = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    setMessage({ type: '', text: '' })
-
-    if (newPassword !== confirmPassword) {
-      setMessage({ type: 'error', text: 'Passwörter stimmen nicht überein' })
-      setLoading(false)
-      return
-    }
-
-    if (newPassword.length < 6) {
-      setMessage({ type: 'error', text: 'Passwort muss mindestens 6 Zeichen lang sein' })
-      setLoading(false)
-      return
-    }
-
-    try {
-      const { error } = await updatePassword(newPassword)
-      if (error) throw error
-      
-      setMessage({ type: 'success', text: 'Passwort erfolgreich geändert' })
-      setNewPassword('')
-      setConfirmPassword('')
-      setShowPasswordChange(false)
-    } catch (error) {
-      setMessage({ type: 'error', text: error.message })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleDeleteAccount = async () => {
-    setLoading(true)
-    setMessage({ type: '', text: '' })
-
-    try {
-      const now = new Date().toISOString()
-
-      // Markiere Account zum Loeschen (Soft-Delete)
-      const { error } = await supabase
-        .from('profiles')
-        .upsert(
-          {
-            id: user.id,
-            deleted_at: now,
-            updated_at: now
-          },
-          { onConflict: 'id' }
-        )
-
-      if (error) throw error
-
-      setIsDeletionScheduled(true)
-      setDeletionDate(now)
-
-      setMessage({ 
-        type: 'success', 
-        text: 'Account zur Loeschung markiert. Dein Account wird in 30 Tagen endgueltig geloescht.' 
-      })
-      
-      setTimeout(async () => {
-        await signOut()
-      }, 2500)
-    } catch (error) {
-      setMessage({ type: 'error', text: 'Fehler beim Markieren: ' + error.message })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleCancelScheduledDeletion = async () => {
-    setLoading(true)
-    setMessage({ type: '', text: '' })
-
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          deleted_at: null,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', user.id)
-
-      if (error) throw error
-
-      setIsDeletionScheduled(false)
-      setDeletionDate(null)
-      setShowDeleteConfirm(false)
-      setMessage({ type: 'success', text: 'Die geplante Loeschung wurde abgebrochen.' })
-    } catch (error) {
-      setMessage({ type: 'error', text: 'Fehler beim Abbrechen: ' + error.message })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const formattedDeletionDate = deletionDate
-    ? new Date(deletionDate).toLocaleDateString('de-DE', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-      })
+  const isDeletionScheduled = !!profile?.deleted_at
+  const deletionFormatted = isDeletionScheduled
+    ? (() => {
+        const d = new Date(profile.deleted_at)
+        d.setDate(d.getDate() + 30)
+        return d.toLocaleDateString(profile?.language === 'en' ? 'en-GB' : 'de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+      })()
     : null
 
-  return (
-    <div className="settings-container">
-      <main className="settings-main">
-        <div className="settings-content">
-          <div className="settings-header">
-            <button onClick={() => navigate('/')} className="back-button-settings" aria-label="Zurück">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M19 12H5M12 19l-7-7 7-7"/>
-              </svg>
-              <span>Zurück</span>
-            </button>
-            <h1>Einstellungen</h1>
-            <p className="subtitle">Verwalte deinen Account</p>
-          </div>
+  // ── Handlers ────────────────────────────────────────────────────────────
+  const saveName = async () => {
+    const trimmed = nameVal.trim()
+    if (!trimmed) return
+    setNameSaving(true)
+    const { error } = await updateProfile({ display_name: trimmed })
+    setMsg(error ? { type: 'error', text: error.message } : { type: 'success', text: t('nameSaved') })
+    setNameSaving(false)
+    setEditingName(false)
+  }
 
-          {message.text && (
-            <div className={`alert alert-${message.type}`}>
-              {message.text}
+  const savePw = async (e) => {
+    e.preventDefault()
+    if (newPw !== confirmPw) { setMsg({ type: 'error', text: t('passwordMismatch') }); return }
+    if (newPw.length < 6) { setMsg({ type: 'error', text: t('passwordTooShort') }); return }
+    setPwSaving(true)
+    const { error } = await updatePassword(newPw)
+    if (error) { setMsg({ type: 'error', text: error.message }) }
+    else { setMsg({ type: 'success', text: t('passwordChanged') }); setEditingPw(false); setNewPw(''); setConfirmPw('') }
+    setPwSaving(false)
+  }
+
+  const handleDelete = async (e) => {
+    e.preventDefault()
+    setDeleting(true)
+    const { error: authErr } = await verifyPassword(deletePw)
+    if (authErr) { setMsg({ type: 'error', text: t('wrongPassword') }); setDeleting(false); return }
+    const { error: delErr } = await markForDeletion()
+    if (delErr) { setMsg({ type: 'error', text: delErr.message }); setDeleting(false); return }
+    setMsg({ type: 'success', text: t('deletionSuccess') })
+    setTimeout(() => signOut(), 2000)
+    setDeleting(false)
+    setDeleteStep(0)
+  }
+
+  const handleCancelDeletion = async () => {
+    setCancellingDeletion(true)
+    const { error } = await cancelDeletion()
+    setMsg(error ? { type: 'error', text: error.message } : { type: 'success', text: t('deletionCancelled') })
+    setCancellingDeletion(false)
+    setDeleteStep(0)
+  }
+
+  // ── Language options ─────────────────────────────────────────────────────
+  const langOptions = [
+    { value: 'de', label: t('german') },
+    { value: 'en', label: t('english') },
+  ]
+  const themeOptions = [
+    { value: 'light', label: t('light') },
+    { value: 'dark', label: t('dark') },
+    { value: 'system', label: t('system') },
+  ]
+
+  return (
+    <div className="settings-page scroll-y">
+      <div className="settings-inner">
+        <h1 className="settings-title">{t('settingsNav')}</h1>
+
+        {msg.text && (
+          <div className={`alert alert-${msg.type}`} onClick={() => setMsg({ type: '', text: '' })}>
+            {msg.text}
+          </div>
+        )}
+
+        {/* ── Allgemein ───────────────────────────────────────────────────── */}
+        <p className="s-section-title">{t('general')}</p>
+        <div className="s-card card">
+
+          {/* Display name */}
+          {!editingName ? (
+            <Row icon={<IconPerson />} label={t('displayName')} desc={profile?.display_name || '—'}>
+              <button className="s-action-btn" onClick={() => { setNameVal(profile?.display_name || ''); setEditingName(true) }}>
+                {t('change')}
+              </button>
+            </Row>
+          ) : (
+            <div className="s-expanded">
+              <p className="s-exp-title">{t('displayName')}</p>
+              <input
+                className="form-input"
+                value={nameVal}
+                onChange={e => setNameVal(e.target.value)}
+                placeholder={t('displayNamePlaceholder')}
+                maxLength={50}
+                autoFocus
+              />
+              <div className="s-btn-row">
+                <button className="btn btn-primary" onClick={saveName} disabled={nameSaving || !nameVal.trim()}>
+                  {nameSaving ? t('saving') : t('save')}
+                </button>
+                <button className="btn btn-secondary" onClick={() => setEditingName(false)} disabled={nameSaving}>
+                  {t('cancel')}
+                </button>
+              </div>
             </div>
           )}
 
-          <div className="settings-grid">
-            {/* Dark Mode */}
-            <div className="card setting-card">
-              <div className="setting-item">
-                <div className="setting-info">
-                  <div className="setting-icon">
-                    <svg className="moon-icon-setting" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-                    </svg>
-                    <svg className="sun-icon-setting" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <circle cx="12" cy="12" r="5"></circle>
-                      <line x1="12" y1="1" x2="12" y2="3"></line>
-                      <line x1="12" y1="21" x2="12" y2="23"></line>
-                      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-                      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-                      <line x1="1" y1="12" x2="3" y2="12"></line>
-                      <line x1="21" y1="12" x2="23" y2="12"></line>
-                      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-                      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-                    </svg>
-                  </div>
-                  <div className="setting-text">
-                    <h3>{isDarkMode ? 'Hell Modus' : 'Dark Modus'}</h3>
-                    <p>{isDarkMode ? 'Helles Design aktivieren' : 'Dunkles Design aktivieren'}</p>
-                  </div>
-                </div>
-                <button onClick={toggleTheme} className="theme-icon-button" aria-label="Dark Mode umschalten">
-                  <svg className="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="5"></circle>
-                    <line x1="12" y1="1" x2="12" y2="3"></line>
-                    <line x1="12" y1="21" x2="12" y2="23"></line>
-                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-                    <line x1="1" y1="12" x2="3" y2="12"></line>
-                    <line x1="21" y1="12" x2="23" y2="12"></line>
-                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-                  </svg>
-                  <svg className="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-                  </svg>
-                </button>
-              </div>
-            </div>
+          {/* Language */}
+          <Row icon={<IconGlobe />} label={t('language')} desc={profile?.language === 'en' ? t('english') : t('german')}>
+            <Seg
+              value={profile?.language || 'de'}
+              options={langOptions}
+              onChange={(v) => updateProfile({ language: v })}
+            />
+          </Row>
 
-            {/* Email */}
-            <div className="card setting-card">
-              <div className="setting-item">
-                <div className="setting-info">
-                  <div className="setting-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                      <polyline points="22,6 12,13 2,6"></polyline>
-                    </svg>
-                  </div>
-                  <div className="setting-text">
-                    <h3>E-Mail</h3>
-                    <p>{user?.email}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Password */}
-            <div className="card setting-card">
-              {!showPasswordChange ? (
-                <div className="setting-item">
-                  <div className="setting-info">
-                    <div className="setting-icon">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                      </svg>
-                    </div>
-                    <div className="setting-text">
-                      <h3>Passwort</h3>
-                      <p>Passwort ändern</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setShowPasswordChange(true)}
-                    className="btn btn-secondary"
-                  >
-                    Ändern
-                  </button>
-                </div>
-              ) : (
-                <div className="password-change-form">
-                  <h3>Passwort ändern</h3>
-                  <form onSubmit={handlePasswordChange}>
-                    <div className="form-group">
-                      <label htmlFor="newPassword" className="form-label">
-                        Neues Passwort
-                      </label>
-                      <input
-                        id="newPassword"
-                        type="password"
-                        className="form-input"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        required
-                        minLength={6}
-                        placeholder="••••••••"
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label htmlFor="confirmPassword" className="form-label">
-                        Passwort bestätigen
-                      </label>
-                      <input
-                        id="confirmPassword"
-                        type="password"
-                        className="form-input"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        required
-                        minLength={6}
-                        placeholder="••••••••"
-                      />
-                    </div>
-
-                    <div className="button-group">
-                      <button
-                        type="submit"
-                        className="btn btn-primary"
-                        disabled={loading}
-                      >
-                        {loading ? 'Speichern...' : 'Speichern'}
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        onClick={() => {
-                          setShowPasswordChange(false)
-                          setNewPassword('')
-                          setConfirmPassword('')
-                          setMessage({ type: '', text: '' })
-                        }}
-                        disabled={loading}
-                      >
-                        Abbrechen
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              )}
-            </div>
-
-            {/* Sign Out */}
-            <div className="card setting-card danger-card">
-              <div className="setting-item">
-                <div className="setting-info">
-                  <div className="setting-icon danger-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                      <polyline points="16 17 21 12 16 7"></polyline>
-                      <line x1="21" y1="12" x2="9" y2="12"></line>
-                    </svg>
-                  </div>
-                  <div className="setting-text">
-                    <h3>Abmelden</h3>
-                    <p>Von deinem Konto abmelden</p>
-                  </div>
-                </div>
-                <button onClick={handleSignOut} className="btn btn-danger">
-                  Abmelden
-                </button>
-              </div>
-            </div>
-
-            {/* Delete Account */}
-            <div className="card setting-card danger-card">
-              {!showDeleteConfirm ? (
-                <div className="setting-item">
-                  <div className="setting-info">
-                    <div className="setting-icon danger-icon">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polyline points="3 6 5 6 21 6"></polyline>
-                        <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
-                        <line x1="10" y1="11" x2="10" y2="17"></line>
-                        <line x1="14" y1="11" x2="14" y2="17"></line>
-                      </svg>
-                    </div>
-                    <div className="setting-text">
-                      <h3>Account löschen</h3>
-                      <p>
-                        {isDeletionScheduled
-                          ? `Zur Loeschung markiert seit ${formattedDeletionDate}`
-                          : 'Alle deine Daten werden unwiderruflich geloescht'}
-                      </p>
-                    </div>
-                  </div>
-                  <button 
-                    onClick={() => setShowDeleteConfirm(true)} 
-                    className="btn btn-danger"
-                  >
-                    {isDeletionScheduled ? 'Status ansehen' : 'Löschen'}
-                  </button>
-                </div>
-              ) : (
-                <div className="delete-confirm">
-                  <div className="warning-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"></path>
-                      <line x1="12" y1="9" x2="12" y2="13"></line>
-                      <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                    </svg>
-                  </div>
-                  <h3>
-                    {isDeletionScheduled
-                      ? 'Löschung bereits geplant'
-                      : 'Account zur Löschung markieren?'}
-                  </h3>
-                  <p>
-                    {isDeletionScheduled
-                      ? 'Dein Account ist bereits zur Loeschung markiert. Du kannst den Vorgang jetzt abbrechen oder weiter aktiv lassen.'
-                      : 'Dein Account wird in 30 Tagen endgueltig geloescht. Alle deine Ziele und Daten werden dann permanent entfernt.'}
-                  </p>
-                  <div className="button-group">
-                    {!isDeletionScheduled && (
-                      <button
-                        onClick={handleDeleteAccount}
-                        className="btn btn-danger"
-                        disabled={loading}
-                      >
-                        {loading ? 'Wird markiert...' : 'Ja, zur Löschung markieren'}
-                      </button>
-                    )}
-
-                    {isDeletionScheduled && (
-                      <button
-                        onClick={handleCancelScheduledDeletion}
-                        className="btn btn-primary"
-                        disabled={loading}
-                      >
-                        {loading ? 'Wird abgebrochen...' : 'Löschung abbrechen'}
-                      </button>
-                    )}
-
-                    <button
-                      onClick={() => setShowDeleteConfirm(false)}
-                      className="btn btn-secondary"
-                      disabled={loading}
-                    >
-                      Abbrechen
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+          {/* Appearance */}
+          <Row icon={<IconSun />} label={t('appearance')} desc="">
+            <Seg
+              value={profile?.theme || 'system'}
+              options={themeOptions}
+              onChange={(v) => updateProfile({ theme: v })}
+            />
+          </Row>
         </div>
-      </main>
+
+        {/* ── Account ─────────────────────────────────────────────────────── */}
+        <p className="s-section-title">{t('account')}</p>
+        <div className="s-card card">
+
+          {/* Email (read-only) */}
+          <Row icon={<IconMail />} label={t('emailLabel')} desc={user?.email} />
+
+          {/* Password */}
+          {!editingPw ? (
+            <Row icon={<IconLock />} label={t('changePassword')} desc={t('changePasswordDesc')}>
+              <button className="s-action-btn" onClick={() => setEditingPw(true)}>{t('change')}</button>
+            </Row>
+          ) : (
+            <div className="s-expanded">
+              <p className="s-exp-title">{t('changePassword')}</p>
+              <form onSubmit={savePw}>
+                <div className="form-group">
+                  <label className="form-label">{t('newPassword')}</label>
+                  <input type="password" className="form-input" value={newPw} onChange={e => setNewPw(e.target.value)} required minLength={6} placeholder="••••••••" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">{t('confirmPassword')}</label>
+                  <input type="password" className="form-input" value={confirmPw} onChange={e => setConfirmPw(e.target.value)} required minLength={6} placeholder="••••••••" />
+                </div>
+                <div className="s-btn-row">
+                  <button type="submit" className="btn btn-primary" disabled={pwSaving}>
+                    {pwSaving ? t('saving') : t('save')}
+                  </button>
+                  <button type="button" className="btn btn-secondary" onClick={() => { setEditingPw(false); setNewPw(''); setConfirmPw('') }} disabled={pwSaving}>
+                    {t('cancel')}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* Sign out */}
+          <Row icon={<IconLogout />} label={t('signOut')} desc={t('signOutDesc')} danger>
+            <button className="s-action-btn danger" onClick={() => signOut()}>{t('signOut')}</button>
+          </Row>
+
+          {/* Delete account */}
+          {deleteStep === 0 && (
+            <Row icon={<IconTrash />} label={t('deleteAccount')} desc={isDeletionScheduled ? `${t('deletionScheduledDesc')} – ${deletionFormatted}` : t('deleteAccountDesc')} danger>
+              <button className="s-action-btn danger" onClick={() => setDeleteStep(isDeletionScheduled ? 2 : 1)}>
+                {isDeletionScheduled ? t('viewStatus') : t('deleteAccount')}
+              </button>
+            </Row>
+          )}
+
+          {/* Delete: password confirmation form */}
+          {deleteStep === 1 && (
+            <div className="s-expanded">
+              <div className="s-warn-icon"><IconWarn /></div>
+              <p className="s-exp-title danger">{t('deleteConfirmTitle')}</p>
+              <p className="s-exp-desc">{t('deleteConfirmText')}</p>
+              <form onSubmit={handleDelete}>
+                <div className="form-group">
+                  <label className="form-label">{t('deletePasswordLabel')}</label>
+                  <input type="password" className="form-input" value={deletePw} onChange={e => setDeletePw(e.target.value)} required placeholder="••••••••" />
+                </div>
+                <div className="s-btn-row">
+                  <button type="submit" className="btn btn-danger" disabled={deleting || !deletePw}>
+                    {deleting ? t('deleting') : t('deleteBtn')}
+                  </button>
+                  <button type="button" className="btn btn-secondary" onClick={() => { setDeleteStep(0); setDeletePw('') }} disabled={deleting}>
+                    {t('cancel')}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* Delete: already scheduled – show cancel option */}
+          {deleteStep === 2 && (
+            <div className="s-expanded">
+              <div className="s-warn-icon"><IconWarn /></div>
+              <p className="s-exp-title danger">{t('deleteConfirmTitle')}</p>
+              <p className="s-exp-desc">{t('restoreText', deletionFormatted)}</p>
+              <div className="s-btn-row">
+                <button className="btn btn-primary" onClick={handleCancelDeletion} disabled={cancellingDeletion}>
+                  {cancellingDeletion ? '…' : t('cancelDeletion')}
+                </button>
+                <button className="btn btn-secondary" onClick={() => setDeleteStep(0)} disabled={cancellingDeletion}>
+                  {t('cancel')}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* bottom padding so content clears BottomNav */}
+        <div style={{ height: 100 }} />
+      </div>
     </div>
   )
 }
