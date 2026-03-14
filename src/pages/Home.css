@@ -1,19 +1,16 @@
-.home-simple-container {
-  min-height: calc(100vh - 100px);
+.home-page {
+  height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
-  text-align: center;
+  padding: 24px 32px 120px; /* bottom padding for BottomNav */
 }
 
-.home-simple-container h1 {
-  font-size: clamp(2rem, 5vw, 3.25rem);
+.home-welcome {
+  font-size: clamp(1.8rem, 6vw, 3rem);
   font-weight: 700;
   letter-spacing: -0.02em;
-  color: #111;
+  color: #000;
+  text-align: center;
 }
-
-body.dark-mode .home-simple-container h1 {
-  color: #f5f5f5;
-}
+body.dark-mode .home-welcome { color: #fff; }
