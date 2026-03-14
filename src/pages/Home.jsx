@@ -1,14 +1,11 @@
-import { useAuth } from '../AuthContext'
-import { useT } from '../useT'
+import { useApp } from '../AppContext'
 import './Home.css'
 
 export default function Home() {
-  const { profile } = useAuth()
-  const t = useT()
-
+  const { profile, t } = useApp()
   return (
-    <main className="home-page">
-      <h1 className="home-welcome">{t('welcomeMsg', profile?.display_name)}</h1>
+    <main className="home-container">
+      <h1>{t.welcome(profile?.display_name)}</h1>
     </main>
   )
 }

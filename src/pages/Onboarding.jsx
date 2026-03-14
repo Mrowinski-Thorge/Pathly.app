@@ -1,44 +1,43 @@
 import { useState } from 'react'
-import { useAuth } from '../AuthContext'
-import { useT } from '../useT'
+import { useNavigate } from 'react-router-dom'
+import { useApp } from '../AppContext'
 import './Onboarding.css'
 
 export default function Onboarding() {
-  const { updateProfile } = useAuth()
-  const t = useT()
-  const [name, setName] = useState('')
+  const { t, updateProfile } = useApp()
+  const navigate = useNavigate()
+  const [name, setName]       = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError]     = useState('')
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    const trimmed = name.trim()
-    if (!trimmed) { setError(t('nameRequired')); return }
-    setLoading(true)
-    setError('')
-    const { error: err } = await updateProfile({ display_name: trimmed, onboarding_done: true })
+    if (!name.trim()) return
+    setLoading(true); setError('')
+    const { error: err } = await updateProfile({
+      display_name: name.trim(),
+      onboarding_done: true,
+    })
     if (err) { setError(err.message); setLoading(false) }
-    // On success, profile.onboarding_done becomes true → App.jsx redirects to /
+    else navigate('/', { replace: true })
   }
 
   return (
-    <div className="ob-page">
-      <div className="ob-card">
-        <h1>{t('onboardingTitle')}</h1>
-        <p>{t('onboardingSubtitle')}</p>
-        {error && <p className="ob-error">{error}</p>}
+    <div className="onboarding-container">
+      <div className="onboarding-card card">
+        <h1>{t.onboardingTitle}</h1>
+        <p>{t.onboardingSubtitle}</p>
+        {error && <div className="alert alert-error">{error}</div>}
         <form onSubmit={handleSubmit}>
           <input
-            className="ob-input"
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder={t('onboardingPlaceholder')}
-            maxLength={50}
-            autoFocus
+            type="text" className="form-input onboarding-input"
+            placeholder={t.namePlaceholder}
+            value={name} onChange={e => setName(e.target.value)}
+            maxLength={40} autoFocus
           />
-          <button className="ob-btn" type="submit" disabled={!name.trim() || loading}>
-            {loading ? '…' : t('onboardingBtn')}
+          <button type="submit" className="btn btn-primary btn-full"
+            disabled={loading || !name.trim()}>
+            {loading ? t.saving : t.letsGo}
           </button>
         </form>
       </div>
