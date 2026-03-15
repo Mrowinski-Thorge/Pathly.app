@@ -45,6 +45,8 @@ function ProtectedRoute({ children }) {
   if (loading) return <div className="loading-container"><div className="spinner" /></div>
   if (!user) return <Navigate to="/auth" replace />
   if (profile && !profile.onboarding_done) return <Navigate to="/onboarding" replace />
+  // If account is marked for deletion, show the DeletionModal overlay (rendered in AppLayout)
+  // but still allow access to protected routes so user can see the modal
   return children
 }
 
@@ -53,6 +55,7 @@ function AppLayout({ children }) {
   const location = useLocation()
   const { user, profile } = useApp()
   const showNav = !!user && !!profile?.onboarding_done
+    && !!profile && !profile.deleted_at  // hide nav when deletion modal shown
     && location.pathname !== '/auth'
     && location.pathname !== '/onboarding'
 
@@ -74,7 +77,13 @@ function AppRoutes() {
     <AppLayout>
       <Routes>
         <Route path="/auth"
-          element={user && profile?.onboarding_done ? <Navigate to="/" replace /> : <Auth />}
+          element={
+            // Only redirect away from /auth if user is logged in AND onboarding done
+            // AND account is NOT marked for deletion (deleted users should be signed out)
+            user && profile?.onboarding_done && !profile?.deleted_at
+              ? <Navigate to="/" replace />
+              : <Auth />
+          }
         />
         <Route path="/onboarding"
           element={!user ? <Navigate to="/auth" replace /> : <Onboarding />}
