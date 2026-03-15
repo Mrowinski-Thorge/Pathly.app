@@ -51,13 +51,36 @@ export default function Settings() {
     e.preventDefault()
     if (!deletePw) return
     setLoading(true)
+
+    // Step 1: verify password
     const ok = await verifyPassword(deletePw)
-    if (!ok) { notify('error', t.wrongPassword); setLoading(false); return }
-    const { error } = await markForDeletion()
-    if (error) { notify('error', error.message); setLoading(false); return }
+    if (!ok) {
+      notify('error', t.wrongPassword)
+      setLoading(false)
+      return
+    }
+
+    // Step 2: mark for deletion via RPC
+    const { error: rpcErr } = await markForDeletion()
+    if (rpcErr) {
+      notify('error', rpcErr.message)
+      setLoading(false)
+      return
+    }
+
+    // Step 3: force-reload profile to confirm deleted_at is set
+    const fresh = await loadProfile(user.id, true)
+    if (!fresh?.deleted_at) {
+      // RPC ran but no row was updated – shouldn't happen after Supabase fix
+      notify('error', t.markFailedError)
+      setLoading(false)
+      return
+    }
+
     notify('success', t.deletionMarkedMsg)
-    setTimeout(() => signOut(), 2200)
     setLoading(false)
+    // Sign out after short delay so user can read the message
+    setTimeout(() => signOut(), 2000)
   }
 
   const cancelDel = async () => {
