@@ -3,96 +3,87 @@ import { useApp } from '../AppContext'
 import { supabase, turnstileSiteKey } from '../supabaseClient'
 import './Auth.css'
 
-// ─── Der Captcha-Container lebt IMMER im DOM (niemals unmounten) ──────────────
-// Wir rendern das Widget einmalig beim ersten Mount und nutzen
-// visibility/height zum Ein-/Ausblenden. Kein display:none, kein Unmount.
-// Theme-Wechsel via turnstile.update() – kein Neu-Rendern.
+// ─── Invisible Turnstile ──────────────────────────────────────────────────────
+// Widget wird einmalig beim Laden gerendert (unsichtbar, kein Klick nötig).
+// Token wird automatisch nach wenigen Sekunden geliefert.
+// Nach jeder Nutzung via reset() neues Token holen.
 
-let globalWidgetId = null        // widget ID (einmalig)
-let globalRendered  = false      // wurde schon gerendert?
+let _widgetId  = null
+let _rendered  = false
+let _callbacks = { onToken: null, onExpire: null, onError: null }
 
-function renderTurnstile(container, { onToken, onExpire, onError }) {
-  if (globalRendered) return
-  if (!window.turnstile) return
-  if (!container) return
-  globalRendered = true
-  globalWidgetId = window.turnstile.render(container, {
-    sitekey: turnstileSiteKey,
-    theme:   document.body.classList.contains('dark-mode') ? 'dark' : 'light',
-    callback:           onToken,
-    'expired-callback': onExpire,
-    'error-callback':   onError,
-    size: 'normal',
+function initTurnstile(container) {
+  if (_rendered || !window.turnstile || !container) return
+  _rendered = true
+  _widgetId = window.turnstile.render(container, {
+    sitekey:  turnstileSiteKey,
+    size:     'invisible',            // ← unsichtbar
+    callback:           (tok) => _callbacks.onToken?.(tok),
+    'expired-callback': ()    => _callbacks.onExpire?.(),
+    'error-callback':   ()    => _callbacks.onError?.(),
   })
 }
 
 function resetTurnstile() {
-  if (!window.turnstile || globalWidgetId === null) return
-  try { window.turnstile.reset(globalWidgetId) } catch (_) {}
+  if (!window.turnstile || _widgetId === null) return
+  try { window.turnstile.reset(_widgetId) } catch (_) {}
 }
 
-function updateTurnstileTheme(dark) {
-  if (!window.turnstile || globalWidgetId === null) return
-  try { window.turnstile.update(globalWidgetId, { theme: dark ? 'dark' : 'light' }) }
-  catch (_) { resetTurnstile() }
+// ─── Hook: liefert Token-Promise ─────────────────────────────────────────────
+function useCaptchaToken() {
+  const getToken = useCallback(() => {
+    return new Promise((resolve, reject) => {
+      if (!window.turnstile) { reject(new Error('Turnstile not loaded')); return }
+      _callbacks.onToken  = (tok) => { resolve(tok) }
+      _callbacks.onError  = ()    => { reject(new Error('captcha_error')) }
+      _callbacks.onExpire = ()    => { reject(new Error('captcha_expired')) }
+      resetTurnstile()
+      // execute() triggert den invisible widget sofort
+      try { window.turnstile.execute(_widgetId) } catch (e) {
+        // Falls execute nicht nötig ist (auto-execute), Token kommt trotzdem
+      }
+    })
+  }, [])
+  return getToken
 }
 
 // ─── Haupt-Komponente ─────────────────────────────────────────────────────────
 export default function Auth() {
   const { signUp, t } = useApp()
 
-  // step: 'login' | 'login_captcha' | 'register' | 'register_captcha' | 'verify' | 'reset'
-  const [step,         setStep]         = useState('login')
-  const [email,        setEmail]        = useState('')
-  const [password,     setPassword]     = useState('')
-  const [loading,      setLoading]      = useState(false)
-  const [msg,          setMsg]          = useState({ type: '', text: '' })
-  const [isDark,       setIsDark]       = useState(() => document.body.classList.contains('dark-mode'))
-  const [captchaToken, setCaptchaToken] = useState('')
-  const [cooldown,     setCooldown]     = useState(0)
+  // step: 'login' | 'register' | 'verify' | 'reset_email'
+  const [step,     setStep]     = useState('login')
+  const [email,    setEmail]    = useState('')
+  const [password, setPassword] = useState('')
+  const [loading,  setLoading]  = useState(false)
+  const [msg,      setMsg]      = useState({ type: '', text: '' })
+  const [isDark,   setIsDark]   = useState(() => document.body.classList.contains('dark-mode'))
+  const [cooldown, setCooldown] = useState(0)
 
-  const captchaRef   = useRef(null)   // DOM-Ref für das Captcha-Element
+  const containerRef = useRef(null)
   const cooldownRef  = useRef(null)
+  const getCaptchaToken = useCaptchaToken()
 
-  // Captcha-Callbacks (stabil via useCallback)
-  const onToken  = useCallback((tok) => setCaptchaToken(tok), [])
-  const onExpire = useCallback(()    => setCaptchaToken(''),  [])
-  const onError  = useCallback(()    => {
-    setCaptchaToken('')
-    setMsg({ type: 'error', text: t.captchaFailed })
-  }, [t])
-
-  // ── Einmaliges Captcha-Rendering beim ersten Mount ────────────────────────
-  // Wir nutzen einen Interval der alle 100ms prüft ob:
-  // a) window.turnstile verfügbar ist
-  // b) captchaRef.current im DOM ist
+  // Turnstile beim ersten Render initialisieren
   useEffect(() => {
     const interval = setInterval(() => {
-      if (window.turnstile && captchaRef.current) {
-        renderTurnstile(captchaRef.current, { onToken, onExpire, onError })
+      if (window.turnstile && containerRef.current) {
+        initTurnstile(containerRef.current)
         clearInterval(interval)
       }
     }, 100)
     return () => clearInterval(interval)
-  }, [onToken, onExpire, onError])
+  }, [])
 
   useEffect(() => () => clearInterval(cooldownRef.current), [])
 
-  const needsCaptcha = ['login_captcha', 'register_captcha', 'reset'].includes(step)
-
-  const softReset = () => { setCaptchaToken(''); resetTurnstile() }
-
-  const goTo = (s) => {
-    setStep(s)
-    setMsg({ type: '', text: '' })
-    if (!['login_captcha', 'register_captcha', 'reset'].includes(s)) softReset()
-  }
+  const goTo = (s) => { setStep(s); setMsg({ type: '', text: '' }) }
 
   const toggleTheme = () => {
     const dark = document.body.classList.toggle('dark-mode')
     setIsDark(dark)
     try { localStorage.setItem('theme', dark ? 'dark' : 'light') } catch (_) {}
-    updateTurnstileTheme(dark)
+    // Theme-Update beim invisible widget nicht nötig
   }
 
   const startCooldown = () => {
@@ -100,6 +91,21 @@ export default function Auth() {
     cooldownRef.current = setInterval(() => {
       setCooldown(v => { if (v <= 1) { clearInterval(cooldownRef.current); return 0 } return v - 1 })
     }, 1000)
+  }
+
+  // ── Captcha holen (mit Fehlerbehandlung) ──────────────────────────────────
+  const withCaptcha = async (fn) => {
+    setLoading(true); setMsg({ type: '', text: '' })
+    let token
+    try {
+      token = await getCaptchaToken()
+    } catch (e) {
+      setMsg({ type: 'error', text: t.captchaFailed })
+      setLoading(false)
+      return
+    }
+    await fn(token)
+    setLoading(false)
   }
 
   // ── Google OAuth ──────────────────────────────────────────────────────────
@@ -115,66 +121,41 @@ export default function Auth() {
     if (error) setMsg({ type: 'error', text: error.message })
   }
 
-  // ── Login Schritt 1: E-Mail + Passwort prüfen, dann → Captcha ────────────
-  const handleLoginStep1 = async (e) => {
+  // ── Login ─────────────────────────────────────────────────────────────────
+  const handleLogin = (e) => {
     e.preventDefault()
-    setLoading(true); setMsg({ type: '', text: '' })
-    // Erst prüfen ob die Credentials prinzipiell stimmen (ohne captcha)
-    // Supabase erlaubt signInWithPassword ohne captcha wenn kein Protection aktiviert ist
-    // Wir wechseln einfach zum Captcha-Step, da Passwort dort mit Token abgesendet wird
-    setLoading(false)
-    goTo('login_captcha')
-  }
-
-  // ── Login Schritt 2: Captcha gelöst → Anmelden ────────────────────────────
-  const handleLoginSubmit = async (e) => {
-    e.preventDefault()
-    if (!captchaToken) return setMsg({ type: 'error', text: t.captchaRequired })
-    setLoading(true); setMsg({ type: '', text: '' })
-    const { error } = await supabase.auth.signInWithPassword({
-      email, password, options: { captchaToken },
+    withCaptcha(async (token) => {
+      const { error } = await supabase.auth.signInWithPassword({
+        email, password, options: { captchaToken: token },
+      })
+      if (error) setMsg({ type: 'error', text: error.message })
+      // Erfolg → AppContext SIGNED_IN → App.jsx redirect
     })
-    if (error) { setMsg({ type: 'error', text: error.message }); softReset() }
-    setLoading(false)
   }
 
-  // ── Registrierung Schritt 1: E-Mail + Passwort → Captcha ─────────────────
-  // Nutzungsbedingungen sind durch Absenden akzeptiert (kein Checkbox)
-  const handleRegisterStep1 = (e) => {
+  // ── Registrierung ─────────────────────────────────────────────────────────
+  const handleRegister = (e) => {
     e.preventDefault()
-    goTo('register_captcha')
-  }
-
-  // ── Registrierung Schritt 2: Captcha → Account erstellen ─────────────────
-  const handleRegisterSubmit = async (e) => {
-    e.preventDefault()
-    if (!captchaToken) return setMsg({ type: 'error', text: t.captchaRequired })
-    setLoading(true); setMsg({ type: '', text: '' })
-    const { error } = await signUp(email, password, captchaToken)
-    if (error) { setMsg({ type: 'error', text: error.message }); softReset() }
-    else { goTo('verify'); startCooldown() }
-    setLoading(false)
-  }
-
-  // ── Passwort zurücksetzen Schritt 1: E-Mail eingeben ─────────────────────
-  const handleResetStep1 = (e) => {
-    e.preventDefault()
-    setMsg({ type: '', text: '' })
-    goTo('reset')
-  }
-
-  // ── Passwort zurücksetzen Schritt 2: Captcha → Link senden ───────────────
-  const handleReset = async (e) => {
-    e.preventDefault()
-    if (!captchaToken) return setMsg({ type: 'error', text: t.captchaRequired })
-    setLoading(true); setMsg({ type: '', text: '' })
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: 'https://mrowinski-thorge.github.io/Pathly.app/auth',
-      options: { captchaToken },
+    withCaptcha(async (token) => {
+      const { error } = await signUp(email, password, token)
+      if (error) setMsg({ type: 'error', text: error.message })
+      else { goTo('verify'); startCooldown() }
     })
-    if (error) setMsg({ type: 'error', text: error.message })
-    else setMsg({ type: 'success', text: t.resetSuccess })
-    softReset(); setLoading(false)
+  }
+
+  // ── Passwort zurücksetzen ─────────────────────────────────────────────────
+  const handleResetStep1 = (e) => { e.preventDefault(); goTo('reset_captcha') }
+
+  const handleReset = (e) => {
+    e.preventDefault()
+    withCaptcha(async (token) => {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: 'https://mrowinski-thorge.github.io/Pathly.app/auth',
+        options: { captchaToken: token },
+      })
+      if (error) setMsg({ type: 'error', text: error.message })
+      else setMsg({ type: 'success', text: t.resetSuccess })
+    })
   }
 
   // ── E-Mail erneut senden ──────────────────────────────────────────────────
@@ -185,29 +166,18 @@ export default function Auth() {
     else setMsg({ type: 'error', text: error.message })
   }
 
-  // ── DAS CAPTCHA-ELEMENT: immer im DOM, nur sichtbar wenn needsCaptcha ─────
-  // Trick: wir rendern es als absolut positioniertes Element außerhalb des
-  // sichtbaren Bereichs wenn nicht aktiv – damit das iframe niemals destroyt wird
-  const captchaEl = (
+  // ── Invisible Turnstile Container (immer im DOM) ──────────────────────────
+  const turnstileEl = (
     <div
-      ref={captchaRef}
-      style={needsCaptcha ? {
-        margin: '0 auto 14px',
-        display: 'flex',
-        justifyContent: 'center',
-      } : {
-        position: 'fixed',
-        top: '-9999px',
-        left: '-9999px',
-        pointerEvents: 'none',
-      }}
+      ref={containerRef}
+      style={{ position: 'fixed', bottom: 0, right: 0, zIndex: -1, opacity: 0, pointerEvents: 'none' }}
     />
   )
 
   // ═══════════════════ VERIFY ══════════════════════════════════════════════
   if (step === 'verify') return (
     <div className="auth-page">
-      {captchaEl}
+      {turnstileEl}
       <ThemeBtn isDark={isDark} onToggle={toggleTheme} />
       <div className="auth-card card">
         <div className="verify-emoji">✉️</div>
@@ -225,38 +195,10 @@ export default function Auth() {
     </div>
   )
 
-  // ═══════════════════ CAPTCHA-SCHRITT (Login oder Registrierung) ═══════════
-  if (step === 'login_captcha' || step === 'register_captcha') {
-    const isLoginCaptcha = step === 'login_captcha'
-    return (
-      <div className="auth-page">
-        {captchaEl}
-        <ThemeBtn isDark={isDark} onToggle={toggleTheme} />
-        <div className="auth-card card">
-          <h1 className="auth-title">{t.appName}</h1>
-          <p className="auth-sub">{t.captchaStepSubtitle}</p>
-          {msg.text && <div className={`alert alert-${msg.type}`}>{msg.text}</div>}
-          <form onSubmit={isLoginCaptcha ? handleLoginSubmit : handleRegisterSubmit}>
-            <button type="submit" className="btn btn-primary btn-full"
-              disabled={loading || !captchaToken} style={{ marginTop: 8 }}>
-              {loading ? t.loadingText : isLoginCaptcha ? t.loginBtn : t.registerBtn}
-            </button>
-          </form>
-          <div className="auth-footer">
-            <button className="link-btn"
-              onClick={() => goTo(isLoginCaptcha ? 'login' : 'register')}>
-              {t.back}
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // ═══════════════════ RESET SCHRITT 1: E-Mail eingeben ════════════════════
+  // ═══════════════════ RESET SCHRITT 1: E-Mail ═════════════════════════════
   if (step === 'reset_email') return (
     <div className="auth-page">
-      {captchaEl}
+      {turnstileEl}
       <ThemeBtn isDark={isDark} onToggle={toggleTheme} />
       <div className="auth-card card">
         <h1 className="auth-title">{t.resetTitle}</h1>
@@ -280,18 +222,17 @@ export default function Auth() {
     </div>
   )
 
-  // ═══════════════════ RESET SCHRITT 2: Captcha ════════════════════════════
-  if (step === 'reset') return (
+  // ═══════════════════ RESET SCHRITT 2: Captcha + Senden ═══════════════════
+  if (step === 'reset_captcha') return (
     <div className="auth-page">
-      {captchaEl}
+      {turnstileEl}
       <ThemeBtn isDark={isDark} onToggle={toggleTheme} />
       <div className="auth-card card">
         <h1 className="auth-title">{t.resetTitle}</h1>
-        <p className="auth-sub">{t.captchaStepSubtitle}</p>
+        <p className="auth-sub">{t.resetSendingSubtitle}</p>
         {msg.text && <div className={`alert alert-${msg.type}`}>{msg.text}</div>}
         <form onSubmit={handleReset}>
-          <button type="submit" className="btn btn-primary btn-full"
-            disabled={loading || !captchaToken} style={{ marginTop: 8 }}>
+          <button type="submit" className="btn btn-primary btn-full" disabled={loading}>
             {loading ? t.sending : t.sendReset}
           </button>
         </form>
@@ -306,7 +247,7 @@ export default function Auth() {
   const isLogin = step === 'login'
   return (
     <div className="auth-page">
-      {captchaEl}
+      {turnstileEl}
       <ThemeBtn isDark={isDark} onToggle={toggleTheme} />
 
       <div className="auth-card card">
@@ -314,7 +255,7 @@ export default function Auth() {
         <p className="auth-sub">{isLogin ? t.welcomeBack : t.createAccount}</p>
         {msg.text && <div className={`alert alert-${msg.type}`}>{msg.text}</div>}
 
-        <form onSubmit={isLogin ? handleLoginStep1 : handleRegisterStep1}>
+        <form onSubmit={isLogin ? handleLogin : handleRegister}>
           <div className="form-group">
             <label className="form-label">{t.emailLabel}</label>
             <input type="email" className="form-input" required
@@ -337,20 +278,18 @@ export default function Auth() {
             </div>
           )}
 
-          {/* Registrierung: Nutzungsbedingungen als Hinweis-Text, kein Checkbox */}
           {!isLogin && (
             <p className="terms-hint">
               {t.termsHint}{' '}
               <a href="https://mrowinski-thorge.github.io/Pathly.com/nutzungsbedingungen"
                 target="_blank" rel="noopener noreferrer" className="terms-link">
                 {t.termsLink}
-              </a>
-              {t.termsHintEnd}
+              </a>{t.termsHintEnd}
             </p>
           )}
 
           <button type="submit" className="btn btn-primary btn-full" disabled={loading}>
-            {loading ? t.loadingText : t.nextBtn}
+            {loading ? t.loadingText : isLogin ? t.loginBtn : t.registerBtn}
           </button>
         </form>
 
@@ -361,8 +300,7 @@ export default function Auth() {
         </button>
 
         <div className="auth-footer">
-          <button className="link-btn"
-            onClick={() => goTo(isLogin ? 'register' : 'login')}>
+          <button className="link-btn" onClick={() => goTo(isLogin ? 'register' : 'login')}>
             {isLogin ? t.noAccount : t.hasAccount}
           </button>
         </div>
