@@ -10,11 +10,9 @@ function applyTheme(theme) {
     (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
   document.body.classList.toggle('dark-mode', dark)
 }
-
 function localLang() {
   try { return localStorage.getItem('lang') || 'de' } catch { return 'de' }
 }
-
 const CACHE_KEY = 'pathly_profile'
 function readCache(userId) {
   try {
@@ -33,26 +31,25 @@ export const AppProvider = ({ children }) => {
   const [user,    setUser]    = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
-  const fetchingRef = useRef(false)
-  const initDone    = useRef(false)
+  const fetchingRef  = useRef(false)
+  // Track if we're in the middle of a password-verify operation so we
+  // don't disrupt the UI when onAuthStateChange fires SIGNED_IN unexpectedly
+  const suppressRef  = useRef(false)
 
   const lang = profile?.language || localLang()
   const t    = getT(lang)
 
-  // Apply theme INSTANTLY on mount (no flash)
   useEffect(() => {
     const saved = localStorage.getItem('theme') || 'system'
     applyTheme(saved)
   }, [])
 
-  // Sync theme whenever profile.theme changes
   useEffect(() => {
     if (!profile?.theme) return
     applyTheme(profile.theme)
     localStorage.setItem('theme', profile.theme)
   }, [profile?.theme])
 
-  // System dark-mode listener
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: dark)')
     const fn = () => {
@@ -63,14 +60,11 @@ export const AppProvider = ({ children }) => {
     return () => mq.removeEventListener('change', fn)
   }, [profile?.theme])
 
-  // ── Core: load profile from Supabase ──────────────────────────────────────
-  // force=true → always bypass cache (used after SIGNED_IN / Google OAuth / etc.)
   const loadProfile = useCallback(async (userId, force = false) => {
     if (!force) {
       const cached = readCache(userId)
       if (cached) { setProfile(cached); return cached }
     }
-    // Debounce concurrent calls
     if (fetchingRef.current) {
       await new Promise(r => setTimeout(r, 120))
       if (fetchingRef.current) return null
@@ -78,10 +72,7 @@ export const AppProvider = ({ children }) => {
     fetchingRef.current = true
     try {
       const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle()
+        .from('profiles').select('*').eq('id', userId).maybeSingle()
       if (error && error.code !== 'PGRST116') throw error
       const p = data || null
       setProfile(p)
@@ -98,53 +89,45 @@ export const AppProvider = ({ children }) => {
     }
   }, [])
 
-  // ── Auth init ─────────────────────────────────────────────────────────────
   useEffect(() => {
     let mounted = true
 
-    // 1) Restore session from storage (fast, no network)
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!mounted) return
       const u = session?.user ?? null
       setUser(u)
       if (u) {
-        loadProfile(u.id).finally(() => { if (mounted) { setLoading(false); initDone.current = true } })
+        loadProfile(u.id).finally(() => { if (mounted) setLoading(false) })
       } else {
-        clearCache(); setProfile(null); setLoading(false); initDone.current = true
+        clearCache(); setProfile(null); setLoading(false)
       }
-    }).catch(() => { if (mounted) { setLoading(false); initDone.current = true } })
+    }).catch(() => { if (mounted) setLoading(false) })
 
-    // 2) React to auth events (email confirm, Google OAuth redirect, etc.)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return
+
+        // Skip SIGNED_IN events that are triggered by internal password verification
+        // (Settings.jsx calls signInWithPassword just to check the password)
+        if (suppressRef.current && event === 'SIGNED_IN') return
+
         const u = session?.user ?? null
         setUser(u)
 
         if (u) {
-          // Force-fresh on all meaningful auth events so profile is current
           const shouldForce = ['SIGNED_IN', 'TOKEN_REFRESHED', 'USER_UPDATED'].includes(event)
-          const p = await loadProfile(u.id, shouldForce)
-          // After email confirmation: if onboarding not done → navigate is handled
-          // by App.jsx route guards reacting to the updated profile state
-          if (p) setProfile(p)   // ensure state is up-to-date
+          await loadProfile(u.id, shouldForce)
         } else {
           clearCache(); setProfile(null)
         }
-
-        // Always clear loading after any auth event
         if (mounted) setLoading(false)
       }
     )
     return () => { mounted = false; subscription.unsubscribe() }
   }, [loadProfile])
 
-  // ── Auth helpers ──────────────────────────────────────────────────────────
   const signUp = (email, password, captchaToken) =>
-    supabase.auth.signUp({
-      email, password,
-      options: captchaToken ? { captchaToken } : {}
-    })
+    supabase.auth.signUp({ email, password, options: captchaToken ? { captchaToken } : {} })
 
   const signIn = (email, password) =>
     supabase.auth.signInWithPassword({ email, password })
@@ -153,15 +136,18 @@ export const AppProvider = ({ children }) => {
 
   const updatePassword = (pw) => supabase.auth.updateUser({ password: pw })
 
+  // verifyPassword: suppress the SIGNED_IN event that signInWithPassword triggers
   const verifyPassword = async (password) => {
     if (!user?.email) return false
+    suppressRef.current = true
     const { error } = await supabase.auth.signInWithPassword({
-      email: user.email, password
+      email: user.email, password,
     })
+    // Allow a tick for the auth event to fire, then unsuppress
+    setTimeout(() => { suppressRef.current = false }, 500)
     return !error
   }
 
-  // ── Profile helpers ───────────────────────────────────────────────────────
   const updateProfile = async (updates) => {
     if (!user) return { error: new Error('not authenticated') }
     const { data, error } = await supabase
