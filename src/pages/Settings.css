@@ -1,0 +1,161 @@
+/* ── Page ──────────────────────────────────────────────────── */
+.sett-page {
+  height: 100vh;
+  display: flex; flex-direction: column;
+  background: #f2f2f7;
+  transition: background 0.3s;
+  overflow: hidden;
+}
+body.dark-mode .sett-page { background: #111; }
+
+/* ── Header ─────────────────────────────────────────────────── */
+.sett-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 52px 20px 12px;
+  flex-shrink: 0;
+}
+.sett-header h1 {
+  font-size: 1.2rem; font-weight: 700; color: #000;
+}
+body.dark-mode .sett-header h1 { color: #fff; }
+
+.sett-back {
+  display: flex; align-items: center; gap: 4px;
+  background: none; border: none; cursor: pointer;
+  font-size: 15px; font-weight: 600; color: #000;
+  -webkit-tap-highlight-color: transparent;
+  padding: 6px 0; min-width: 60px;
+}
+body.dark-mode .sett-back { color: #fff; }
+.sett-back svg { width: 18px; height: 18px; }
+
+/* ── Scroll area ────────────────────────────────────────────── */
+.sett-scroll {
+  flex: 1; overflow-y: auto;
+  padding: 4px 16px 0;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── Section label ──────────────────────────────────────────── */
+.sett-section-lbl {
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.07em;
+  color: rgba(0,0,0,.4);
+  padding: 16px 4px 6px;
+}
+body.dark-mode .sett-section-lbl { color: rgba(255,255,255,.4); }
+
+/* ── Card ───────────────────────────────────────────────────── */
+.sett-card {
+  border-radius: 16px; overflow: hidden; padding: 0;
+  background: rgba(255,255,255,.7) !important;
+}
+body.dark-mode .sett-card {
+  background: rgba(255,255,255,.07) !important;
+}
+
+/* ── Row ────────────────────────────────────────────────────── */
+.sett-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 14px; min-height: 52px;
+}
+
+.sett-icon {
+  width: 30px; height: 30px; border-radius: 8px;
+  background: rgba(0,0,0,.07); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+body.dark-mode .sett-icon { background: rgba(255,255,255,.1); }
+.sett-icon svg { width: 15px; height: 15px; color: #000; }
+body.dark-mode .sett-icon svg { color: #fff; }
+
+.sett-icon-danger { background: rgba(220,38,38,.1) !important; }
+.sett-icon-danger svg { color: #dc2626 !important; }
+body.dark-mode .sett-icon-danger { background: rgba(220,38,38,.15) !important; }
+
+.sett-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sett-lbl  { font-size: 14px; font-weight: 500; color: #000; }
+body.dark-mode .sett-lbl { color: #fff; }
+.sett-desc {
+  font-size: 12px; color: rgba(0,0,0,.45);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+body.dark-mode .sett-desc { color: rgba(255,255,255,.4); }
+
+/* ── Divider ────────────────────────────────────────────────── */
+.sett-divider { height: 1px; background: rgba(0,0,0,.06); margin: 0 14px; }
+body.dark-mode .sett-divider { background: rgba(255,255,255,.07); }
+
+/* ── Pill action button ─────────────────────────────────────── */
+.sett-pill {
+  background: rgba(0,0,0,.07); border: none;
+  border-radius: 20px; padding: 6px 13px;
+  font-size: 13px; font-weight: 500; color: #000;
+  cursor: pointer; flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s;
+}
+body.dark-mode .sett-pill { background: rgba(255,255,255,.1); color: #fff; }
+.sett-pill:active { background: rgba(0,0,0,.14); }
+body.dark-mode .sett-pill:active { background: rgba(255,255,255,.18); }
+.sett-pill-danger { background: rgba(220,38,38,.1) !important; color: #dc2626 !important; }
+.sett-pill-danger:active { background: rgba(220,38,38,.18) !important; }
+
+/* ── Segmented control ──────────────────────────────────────── */
+.seg {
+  display: flex; background: rgba(0,0,0,.07);
+  border-radius: 8px; padding: 2px; gap: 2px; flex-shrink: 0;
+}
+body.dark-mode .seg { background: rgba(255,255,255,.1); }
+.seg-btn {
+  background: transparent; border: none; cursor: pointer;
+  padding: 5px 10px; border-radius: 6px;
+  font-size: 12px; font-weight: 500;
+  color: rgba(0,0,0,.5);
+  -webkit-tap-highlight-color: transparent;
+  transition: all 0.15s; white-space: nowrap;
+}
+body.dark-mode .seg-btn { color: rgba(255,255,255,.5); }
+.seg-btn.seg-on {
+  background: #fff; color: #000;
+  box-shadow: 0 1px 3px rgba(0,0,0,.12);
+}
+body.dark-mode .seg-btn.seg-on { background: rgba(255,255,255,.18); color: #fff; }
+
+/* ── Expanded form ──────────────────────────────────────────── */
+.sett-expand {
+  padding: 14px 14px 16px;
+  background: rgba(0,0,0,.015);
+  border-top: 1px solid rgba(0,0,0,.05);
+}
+body.dark-mode .sett-expand {
+  background: rgba(255,255,255,.02);
+  border-top-color: rgba(255,255,255,.06);
+}
+.sett-expand .form-input { margin-bottom: 0; }
+
+.sett-row-btns {
+  display: flex; gap: 8px; margin-top: 12px;
+}
+.sett-row-btns .btn {
+  flex: 1; padding: 10px 14px; font-size: 14px;
+}
+
+/* ── Warn icon ──────────────────────────────────────────────── */
+.sett-warn-icon {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: rgba(220,38,38,.1);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 10px; color: #dc2626;
+}
+.sett-warn-icon svg { width: 18px; height: 18px; }
+
+.sett-expand-desc {
+  font-size: 13px; color: rgba(0,0,0,.55);
+  line-height: 1.5; margin-bottom: 14px;
+}
+body.dark-mode .sett-expand-desc { color: rgba(255,255,255,.5); }
+
+@media (max-width: 380px) {
+  .seg-btn { padding: 5px 7px; font-size: 11px; }
+}
