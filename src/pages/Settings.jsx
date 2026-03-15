@@ -19,14 +19,15 @@ export default function Settings() {
   const [newPw, setNewPw]           = useState('')
   const [confirmPw, setConfirmPw]   = useState('')
   const [showDelete, setShowDelete] = useState(false)
+  const [deletePw, setDeletePw]     = useState('')
   const [loading, setLoading]       = useState(false)
 
-  const isDel       = !!profile?.deleted_at
-  const isGoogle    = profile?.auth_provider === 'google'
+  const isDel    = !!profile?.deleted_at
+  const isGoogle = profile?.auth_provider === 'google'
 
   const notify = (type, text) => {
     setMsg({ type, text })
-    setTimeout(() => setMsg({ type: '', text: '' }), 4000)
+    setTimeout(() => setMsg({ type: '', text: '' }), 5000)
   }
 
   const saveName = async () => {
@@ -48,73 +49,83 @@ export default function Settings() {
     setLoading(false)
   }
 
-  // ── Account deletion ───────────────────────────────────────────────────────
-  // Google users: re-authenticate via Google OAuth popup before deleting
-  // Email users: verify password
-  const confirmDelete = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-
-    if (isGoogle) {
-      // Re-authenticate with Google
-      const { error: authErr } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: 'https://mrowinski-thorge.github.io/Pathly.app/',
-          queryParams: { prompt: 'select_account' },
-          skipBrowserRedirect: false,
-        },
-      })
-      if (authErr) { notify('error', authErr.message); setLoading(false); return }
-      // Google OAuth will redirect away – deletion happens on return via deep link
-      // For now, just mark for deletion directly (re-auth already done implicitly by session)
-    }
-
-    // Mark for deletion
-    const { error: rpcErr } = await markForDeletion()
-    if (rpcErr) { notify('error', rpcErr.message); setLoading(false); return }
-
-    const fresh = await loadProfile(user.id, true)
-    if (!fresh?.deleted_at) {
-      notify('error', t.markFailedError); setLoading(false); return
-    }
-
-    notify('success', t.deletionMarkedMsg)
-    setLoading(false)
-    setTimeout(() => signOut(), 2000)
-  }
-
-  // For email users, deletion requires password verification
-  const [deletePw, setDeletePw] = useState('')
+  // ── Account löschen: Email-User ───────────────────────────────────────────
+  // Wir prüfen das Passwort direkt via signInWithPassword.
+  // WICHTIG: Wir unterdrücken den onAuthStateChange-Effekt indem wir danach
+  // sofort markForDeletion aufrufen – der SIGNED_IN Event wird vom AppContext
+  // behandelt, aber da wir danach signOut aufrufen ist das kein Problem.
   const confirmDeleteEmail = async (e) => {
     e.preventDefault()
     if (!deletePw) return
     setLoading(true)
+    setMsg({ type: '', text: '' })
 
-    // Verify password
-    const { error: verifyErr } = await supabase.auth.signInWithPassword({
-      email: user.email, password: deletePw,
+    // Schritt 1: Passwort verifizieren
+    const { error: pwErr } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: deletePw,
     })
-    if (verifyErr) { notify('error', t.wrongPassword); setLoading(false); return }
+    if (pwErr) {
+      notify('error', t.wrongPassword)
+      setLoading(false)
+      return
+    }
+
+    // Schritt 2: Account für Löschung markieren
+    const { error: rpcErr } = await markForDeletion()
+    if (rpcErr) {
+      notify('error', rpcErr.message)
+      setLoading(false)
+      return
+    }
+
+    // Schritt 3: Profil neu laden um deleted_at zu bestätigen
+    const fresh = await loadProfile(user.id, true)
+    if (!fresh?.deleted_at) {
+      notify('error', t.markFailedError)
+      setLoading(false)
+      return
+    }
+
+    // Kurz warten dann abmelden → DeletionModal erscheint beim nächsten Login
+    setLoading(false)
+    await signOut()
+  }
+
+  // ── Account löschen: Google-User ─────────────────────────────────────────
+  // Google-User haben kein Passwort → direkt markieren (Session ist gültig)
+  const confirmDeleteGoogle = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    setMsg({ type: '', text: '' })
 
     const { error: rpcErr } = await markForDeletion()
-    if (rpcErr) { notify('error', rpcErr.message); setLoading(false); return }
+    if (rpcErr) {
+      notify('error', rpcErr.message)
+      setLoading(false)
+      return
+    }
 
     const fresh = await loadProfile(user.id, true)
     if (!fresh?.deleted_at) {
-      notify('error', t.markFailedError); setLoading(false); return
+      notify('error', t.markFailedError)
+      setLoading(false)
+      return
     }
 
-    notify('success', t.deletionMarkedMsg)
     setLoading(false)
-    setTimeout(() => signOut(), 2000)
+    await signOut()
   }
 
   const cancelDel = async () => {
     setLoading(true)
     const { error } = await cancelDeletion()
     if (error) notify('error', error.message)
-    else { await loadProfile(user.id); notify('success', t.deletionCancelledMsg); setShowDelete(false) }
+    else {
+      await loadProfile(user.id, true)
+      notify('success', t.deletionCancelledMsg)
+      setShowDelete(false)
+    }
     setLoading(false)
   }
 
@@ -154,7 +165,6 @@ export default function Settings() {
         <p className="sett-section-lbl">{t.general}</p>
         <div className="sett-card card">
 
-          {/* Name */}
           <div className="sett-row">
             <SIcon><PersonIcon/></SIcon>
             <div className="sett-info">
@@ -187,7 +197,6 @@ export default function Settings() {
 
           <div className="sett-divider"/>
 
-          {/* Sprache */}
           <div className="sett-row">
             <SIcon><GlobeIcon/></SIcon>
             <div className="sett-info">
@@ -203,7 +212,6 @@ export default function Settings() {
 
           <div className="sett-divider"/>
 
-          {/* Darstellung */}
           <div className="sett-row">
             <SIcon><MoonIcon/></SIcon>
             <div className="sett-info">
@@ -224,7 +232,6 @@ export default function Settings() {
         <p className="sett-section-lbl">{t.account}</p>
         <div className="sett-card card">
 
-          {/* E-Mail */}
           <div className="sett-row">
             <SIcon><MailIcon/></SIcon>
             <div className="sett-info">
@@ -235,7 +242,7 @@ export default function Settings() {
 
           <div className="sett-divider"/>
 
-          {/* Passwort – Google users see "Mit Google verknüpft" */}
+          {/* Passwort – Google-User sehen Hinweis */}
           <div className="sett-row">
             <SIcon><LockIcon/></SIcon>
             <div className="sett-info">
@@ -255,8 +262,7 @@ export default function Settings() {
                 onChange={e => setNewPw(e.target.value)} />
               <input type="password" className="form-input" required minLength={6}
                 placeholder={t.confirmPassword} value={confirmPw}
-                onChange={e => setConfirmPw(e.target.value)}
-                style={{ marginTop: 8 }} />
+                onChange={e => setConfirmPw(e.target.value)} style={{ marginTop: 8 }} />
               <div className="sett-row-btns">
                 <button type="submit" className="btn btn-primary" disabled={loading}>
                   {loading ? t.saving : t.save}
@@ -271,7 +277,6 @@ export default function Settings() {
 
           <div className="sett-divider"/>
 
-          {/* Abmelden */}
           <div className="sett-row">
             <SIcon danger><LogoutIcon/></SIcon>
             <div className="sett-info">
@@ -285,7 +290,6 @@ export default function Settings() {
 
           <div className="sett-divider"/>
 
-          {/* Account löschen */}
           <div className="sett-row">
             <SIcon danger><TrashIcon/></SIcon>
             <div className="sett-info">
@@ -302,6 +306,7 @@ export default function Settings() {
 
           {showDelete && (
             isDel ? (
+              /* Account bereits markiert */
               <div className="sett-expand">
                 <div className="sett-warn-icon"><WarnIcon/></div>
                 <p className="sett-expand-desc">{t.deletionScheduledDesc(delDate)}</p>
@@ -315,8 +320,8 @@ export default function Settings() {
                 </div>
               </div>
             ) : isGoogle ? (
-              /* Google users: confirm with button (re-auth via Google) */
-              <form className="sett-expand" onSubmit={confirmDelete}>
+              /* Google-User: kein Passwort, direkte Bestätigung */
+              <form className="sett-expand" onSubmit={confirmDeleteGoogle}>
                 <div className="sett-warn-icon"><WarnIcon/></div>
                 <p className="sett-expand-desc">{t.deleteConfirmTextGoogle}</p>
                 <div className="sett-row-btns">
@@ -330,7 +335,7 @@ export default function Settings() {
                 </div>
               </form>
             ) : (
-              /* Email users: verify password */
+              /* Email-User: Passwort eingeben */
               <form className="sett-expand" onSubmit={confirmDeleteEmail}>
                 <div className="sett-warn-icon"><WarnIcon/></div>
                 <p className="sett-expand-desc">{t.deleteConfirmText}</p>
