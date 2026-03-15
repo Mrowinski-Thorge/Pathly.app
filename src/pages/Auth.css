@@ -112,3 +112,11 @@ body.dark-mode .link-btn { color: rgba(255,255,255,.6); }
 @media (max-width: 440px) {
   .auth-card { padding: 28px 18px; }
 }
+
+/* ── Resend button ─────────────────────────────────────────── */
+.btn-secondary {
+  background: rgba(0,0,0,.06);
+  border: none; color: #000;
+}
+body.dark-mode .btn-secondary { background: rgba(255,255,255,.1); color: #fff; }
+.btn-secondary:disabled { opacity: 0.45; cursor: not-allowed; }

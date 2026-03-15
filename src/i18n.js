@@ -59,9 +59,13 @@ const de = {
   wrongPassword: 'Falsches Passwort. Bitte versuche es erneut.',
   cancelDeletion: 'Löschung abbrechen', viewStatus: 'Status ansehen',
   deletionCancelledMsg: 'Die geplante Löschung wurde abgebrochen.',
+  markFailedError: 'Fehler: Konto konnte nicht markiert werden.',
   // Restoration modal
   restorationTitle: 'Account zur Löschung markiert',
   restorationText: (date) => `Dein Account wird am ${date} endgültig gelöscht. Möchtest du ihn wiederherstellen?`,
+  resendEmail: 'E-Mail erneut senden',
+  resendIn: 'Erneut senden in',
+  resendSuccess: 'Bestätigungs-E-Mail wurde erneut gesendet.',
   restore: 'Ja, wiederherstellen', keepDeleting: 'Nein, abmelden',
 }
 
@@ -118,8 +122,12 @@ const en = {
   wrongPassword: 'Wrong password. Please try again.',
   cancelDeletion: 'Cancel deletion', viewStatus: 'View status',
   deletionCancelledMsg: 'The scheduled deletion has been cancelled.',
+  markFailedError: 'Error: Account could not be marked for deletion.',
   restorationTitle: 'Account Scheduled for Deletion',
   restorationText: (date) => `Your account will be permanently deleted on ${date}. Would you like to restore it?`,
+  resendEmail: 'Resend Email',
+  resendIn: 'Resend in',
+  resendSuccess: 'Confirmation email has been resent.',
   restore: 'Yes, restore', keepDeleting: 'No, sign out',
 }
 
