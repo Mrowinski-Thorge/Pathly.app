@@ -12,15 +12,17 @@ export default function Settings() {
   } = useApp()
   const navigate = useNavigate()
 
-  const [msg, setMsg]               = useState({ type: '', text: '' })
-  const [editName, setEditName]     = useState(false)
-  const [nameVal, setNameVal]       = useState('')
-  const [editPw, setEditPw]         = useState(false)
-  const [newPw, setNewPw]           = useState('')
-  const [confirmPw, setConfirmPw]   = useState('')
+  const [msg, setMsg]           = useState({ type: '', text: '' })
+  const [editName, setEditName] = useState(false)
+  const [nameVal, setNameVal]   = useState('')
+  const [editPw, setEditPw]     = useState(false)
+  const [newPw, setNewPw]       = useState('')
+  const [confirmPw, setConfirmPw] = useState('')
   const [showDelete, setShowDelete] = useState(false)
-  const [deletePw, setDeletePw]     = useState('')
-  const [loading, setLoading]       = useState(false)
+  const [deletePw, setDeletePw] = useState('')
+  const [deleteStep, setDeleteStep] = useState('confirm') // 'confirm' | 'password'
+  const [loading, setLoading]   = useState(false)
+  const [pwError, setPwError]   = useState('')
 
   const isDel    = !!profile?.deleted_at
   const isGoogle = profile?.auth_provider === 'google'
@@ -41,7 +43,7 @@ export default function Settings() {
   const savePw = async (e) => {
     e.preventDefault()
     if (newPw !== confirmPw) return notify('error', t.passwordMismatch)
-    if (newPw.length < 6)   return notify('error', t.passwordTooShort)
+    if (newPw.length < 6) return notify('error', t.passwordTooShort)
     setLoading(true)
     const { error } = await updatePassword(newPw)
     if (error) notify('error', error.message)
@@ -49,29 +51,36 @@ export default function Settings() {
     setLoading(false)
   }
 
-  // ── Account löschen: Email-User ───────────────────────────────────────────
-  // Wir prüfen das Passwort direkt via signInWithPassword.
-  // WICHTIG: Wir unterdrücken den onAuthStateChange-Effekt indem wir danach
-  // sofort markForDeletion aufrufen – der SIGNED_IN Event wird vom AppContext
-  // behandelt, aber da wir danach signOut aufrufen ist das kein Problem.
-  const confirmDeleteEmail = async (e) => {
+  // ── Account löschen: Schritt 1 für Email-User – Passwort prüfen ───────────
+  const verifyAndProceed = async (e) => {
     e.preventDefault()
     if (!deletePw) return
+    setPwError('')
     setLoading(true)
-    setMsg({ type: '', text: '' })
 
-    // Schritt 1: Passwort verifizieren
-    const { error: pwErr } = await supabase.auth.signInWithPassword({
+    // Direkt via Supabase prüfen – OHNE onAuthStateChange zu triggern
+    // indem wir fetchAndThrow nutzen statt die JS-Methode
+    const { error } = await supabase.auth.signInWithPassword({
       email: user.email,
       password: deletePw,
     })
-    if (pwErr) {
-      notify('error', t.wrongPassword)
-      setLoading(false)
+
+    setLoading(false)
+
+    if (error) {
+      setPwError(t.wrongPassword)
       return
     }
 
-    // Schritt 2: Account für Löschung markieren
+    // Passwort korrekt → zum Bestätigungs-Schritt
+    setDeleteStep('confirm')
+    doDelete()
+  }
+
+  // ── Account tatsächlich löschen ───────────────────────────────────────────
+  const doDelete = async () => {
+    setLoading(true)
+
     const { error: rpcErr } = await markForDeletion()
     if (rpcErr) {
       notify('error', rpcErr.message)
@@ -79,64 +88,40 @@ export default function Settings() {
       return
     }
 
-    // Schritt 3: Profil neu laden um deleted_at zu bestätigen
-    const fresh = await loadProfile(user.id, true)
-    if (!fresh?.deleted_at) {
-      notify('error', t.markFailedError)
-      setLoading(false)
-      return
-    }
-
-    // Kurz warten dann abmelden → DeletionModal erscheint beim nächsten Login
+    // Profil neu laden
+    await loadProfile(user.id, true)
     setLoading(false)
+
+    // Abmelden – nach dem Logout zeigt /auth den normalen Anmeldescreen
+    // (deleted_at ist jetzt gesetzt, beim nächsten Login kommt DeletionModal)
     await signOut()
   }
 
-  // ── Account löschen: Google-User ─────────────────────────────────────────
-  // Google-User haben kein Passwort → direkt markieren (Session ist gültig)
-  const confirmDeleteGoogle = async (e) => {
+  // ── Löschung starten ──────────────────────────────────────────────────────
+  const handleDeleteClick = (e) => {
     e.preventDefault()
-    setLoading(true)
-    setMsg({ type: '', text: '' })
-
-    const { error: rpcErr } = await markForDeletion()
-    if (rpcErr) {
-      notify('error', rpcErr.message)
-      setLoading(false)
-      return
+    if (isGoogle) {
+      // Google-User: direkt löschen (kein Passwort)
+      doDelete()
+    } else {
+      // Email-User: erst Passwort prüfen
+      verifyAndProceed(e)
     }
-
-    const fresh = await loadProfile(user.id, true)
-    if (!fresh?.deleted_at) {
-      notify('error', t.markFailedError)
-      setLoading(false)
-      return
-    }
-
-    setLoading(false)
-    await signOut()
   }
 
   const cancelDel = async () => {
     setLoading(true)
     const { error } = await cancelDeletion()
     if (error) notify('error', error.message)
-    else {
-      await loadProfile(user.id, true)
-      notify('success', t.deletionCancelledMsg)
-      setShowDelete(false)
-    }
+    else { await loadProfile(user.id, true); notify('success', t.deletionCancelledMsg); setShowDelete(false) }
     setLoading(false)
   }
 
-  const delDate = profile?.deleted_at
-    ? (() => {
-        const d = new Date(profile.deleted_at)
-        d.setDate(d.getDate() + 30)
-        return d.toLocaleDateString(lang === 'en' ? 'en-GB' : 'de-DE',
-          { day:'2-digit', month:'2-digit', year:'numeric' })
-      })()
-    : ''
+  const delDate = profile?.deleted_at ? (() => {
+    const d = new Date(profile.deleted_at)
+    d.setDate(d.getDate() + 30)
+    return d.toLocaleDateString(lang === 'en' ? 'en-GB' : 'de-DE', { day:'2-digit', month:'2-digit', year:'numeric' })
+  })() : ''
 
   const theme = profile?.theme || 'system'
   const lng   = profile?.language || 'de'
@@ -155,16 +140,12 @@ export default function Settings() {
       </div>
 
       <div className="sett-scroll">
-        {msg.text && (
-          <div className={`alert alert-${msg.type}`} style={{margin:'0 0 16px'}}>
-            {msg.text}
-          </div>
-        )}
+        {msg.text && <div className={`alert alert-${msg.type}`} style={{margin:'0 0 16px'}}>{msg.text}</div>}
 
-        {/* ── Allgemein ─────────────────── */}
         <p className="sett-section-lbl">{t.general}</p>
         <div className="sett-card card">
 
+          {/* Name */}
           <div className="sett-row">
             <SIcon><PersonIcon/></SIcon>
             <div className="sett-info">
@@ -184,54 +165,44 @@ export default function Settings() {
                 value={nameVal} onChange={e => setNameVal(e.target.value)}
                 placeholder={t.namePlaceholder} />
               <div className="sett-row-btns">
-                <button className="btn btn-primary"
-                  disabled={loading || !nameVal.trim()} onClick={saveName}>
+                <button className="btn btn-primary" disabled={loading || !nameVal.trim()} onClick={saveName}>
                   {loading ? t.saving : t.save}
                 </button>
-                <button className="btn btn-secondary" onClick={() => setEditName(false)}>
-                  {t.cancel}
-                </button>
+                <button className="btn btn-secondary" onClick={() => setEditName(false)}>{t.cancel}</button>
               </div>
             </div>
           )}
 
           <div className="sett-divider"/>
 
+          {/* Sprache */}
           <div className="sett-row">
             <SIcon><GlobeIcon/></SIcon>
-            <div className="sett-info">
-              <span className="sett-lbl">{t.language}</span>
-            </div>
+            <div className="sett-info"><span className="sett-lbl">{t.language}</span></div>
             <div className="seg">
-              <button className={`seg-btn${lng==='de'?' seg-on':''}`}
-                onClick={() => updateProfile({ language:'de' })}>DE</button>
-              <button className={`seg-btn${lng==='en'?' seg-on':''}`}
-                onClick={() => updateProfile({ language:'en' })}>EN</button>
+              <button className={`seg-btn${lng==='de'?' seg-on':''}`} onClick={() => updateProfile({ language:'de' })}>DE</button>
+              <button className={`seg-btn${lng==='en'?' seg-on':''}`} onClick={() => updateProfile({ language:'en' })}>EN</button>
             </div>
           </div>
 
           <div className="sett-divider"/>
 
+          {/* Darstellung */}
           <div className="sett-row">
             <SIcon><MoonIcon/></SIcon>
-            <div className="sett-info">
-              <span className="sett-lbl">{t.appearance}</span>
-            </div>
+            <div className="sett-info"><span className="sett-lbl">{t.appearance}</span></div>
             <div className="seg">
-              <button className={`seg-btn${theme==='light'?' seg-on':''}`}
-                onClick={() => updateProfile({ theme:'light' })}>{t.light}</button>
-              <button className={`seg-btn${theme==='system'?' seg-on':''}`}
-                onClick={() => updateProfile({ theme:'system' })}>{t.system}</button>
-              <button className={`seg-btn${theme==='dark'?' seg-on':''}`}
-                onClick={() => updateProfile({ theme:'dark' })}>{t.dark}</button>
+              <button className={`seg-btn${theme==='light'?' seg-on':''}`} onClick={() => updateProfile({ theme:'light' })}>{t.light}</button>
+              <button className={`seg-btn${theme==='system'?' seg-on':''}`} onClick={() => updateProfile({ theme:'system' })}>{t.system}</button>
+              <button className={`seg-btn${theme==='dark'?' seg-on':''}`} onClick={() => updateProfile({ theme:'dark' })}>{t.dark}</button>
             </div>
           </div>
         </div>
 
-        {/* ── Account ───────────────────── */}
         <p className="sett-section-lbl">{t.account}</p>
         <div className="sett-card card">
 
+          {/* E-Mail */}
           <div className="sett-row">
             <SIcon><MailIcon/></SIcon>
             <div className="sett-info">
@@ -242,14 +213,12 @@ export default function Settings() {
 
           <div className="sett-divider"/>
 
-          {/* Passwort – Google-User sehen Hinweis */}
+          {/* Passwort */}
           <div className="sett-row">
             <SIcon><LockIcon/></SIcon>
             <div className="sett-info">
               <span className="sett-lbl">{t.changePassword}</span>
-              <span className="sett-desc">
-                {isGoogle ? t.linkedWithGoogle : t.changePasswordDesc}
-              </span>
+              <span className="sett-desc">{isGoogle ? t.linkedWithGoogle : t.changePasswordDesc}</span>
             </div>
             {!isGoogle && !editPw && (
               <button className="sett-pill" onClick={() => setEditPw(true)}>{t.change}</button>
@@ -258,8 +227,7 @@ export default function Settings() {
           {!isGoogle && editPw && (
             <form className="sett-expand" onSubmit={savePw}>
               <input type="password" className="form-input" required minLength={6}
-                placeholder={t.newPassword} value={newPw}
-                onChange={e => setNewPw(e.target.value)} />
+                placeholder={t.newPassword} value={newPw} onChange={e => setNewPw(e.target.value)} />
               <input type="password" className="form-input" required minLength={6}
                 placeholder={t.confirmPassword} value={confirmPw}
                 onChange={e => setConfirmPw(e.target.value)} style={{ marginTop: 8 }} />
@@ -277,36 +245,32 @@ export default function Settings() {
 
           <div className="sett-divider"/>
 
+          {/* Abmelden */}
           <div className="sett-row">
             <SIcon danger><LogoutIcon/></SIcon>
             <div className="sett-info">
               <span className="sett-lbl">{t.signOut}</span>
               <span className="sett-desc">{t.signOutDesc}</span>
             </div>
-            <button className="sett-pill sett-pill-danger" onClick={signOut}>
-              {t.signOut}
-            </button>
+            <button className="sett-pill sett-pill-danger" onClick={signOut}>{t.signOut}</button>
           </div>
 
           <div className="sett-divider"/>
 
+          {/* Account löschen */}
           <div className="sett-row">
             <SIcon danger><TrashIcon/></SIcon>
             <div className="sett-info">
               <span className="sett-lbl">{t.deleteAccount}</span>
-              <span className="sett-desc">
-                {isDel ? t.deletionScheduledDesc(delDate) : t.deleteAccountDesc}
-              </span>
+              <span className="sett-desc">{isDel ? t.deletionScheduledDesc(delDate) : t.deleteAccountDesc}</span>
             </div>
-            <button className="sett-pill sett-pill-danger"
-              onClick={() => setShowDelete(!showDelete)}>
+            <button className="sett-pill sett-pill-danger" onClick={() => { setShowDelete(!showDelete); setDeletePw(''); setPwError('') }}>
               {isDel ? t.viewStatus : t.deleteAccount}
             </button>
           </div>
 
           {showDelete && (
             isDel ? (
-              /* Account bereits markiert */
               <div className="sett-expand">
                 <div className="sett-warn-icon"><WarnIcon/></div>
                 <p className="sett-expand-desc">{t.deletionScheduledDesc(delDate)}</p>
@@ -314,41 +278,32 @@ export default function Settings() {
                   <button className="btn btn-primary" disabled={loading} onClick={cancelDel}>
                     {loading ? '…' : t.cancelDeletion}
                   </button>
-                  <button className="btn btn-secondary" onClick={() => setShowDelete(false)}>
-                    {t.cancel}
-                  </button>
+                  <button className="btn btn-secondary" onClick={() => setShowDelete(false)}>{t.cancel}</button>
                 </div>
               </div>
-            ) : isGoogle ? (
-              /* Google-User: kein Passwort, direkte Bestätigung */
-              <form className="sett-expand" onSubmit={confirmDeleteGoogle}>
-                <div className="sett-warn-icon"><WarnIcon/></div>
-                <p className="sett-expand-desc">{t.deleteConfirmTextGoogle}</p>
-                <div className="sett-row-btns">
-                  <button type="submit" className="btn btn-danger" disabled={loading}>
-                    {loading ? t.deleting : t.confirmDeleteBtn}
-                  </button>
-                  <button type="button" className="btn btn-secondary"
-                    onClick={() => setShowDelete(false)}>
-                    {t.cancel}
-                  </button>
-                </div>
-              </form>
             ) : (
-              /* Email-User: Passwort eingeben */
-              <form className="sett-expand" onSubmit={confirmDeleteEmail}>
+              <form className="sett-expand" onSubmit={handleDeleteClick}>
                 <div className="sett-warn-icon"><WarnIcon/></div>
-                <p className="sett-expand-desc">{t.deleteConfirmText}</p>
-                <input type="password" className="form-input" required
-                  placeholder={t.currentPassword} value={deletePw}
-                  onChange={e => setDeletePw(e.target.value)} />
-                <div className="sett-row-btns">
+                <p className="sett-expand-desc">
+                  {isGoogle ? t.deleteConfirmTextGoogle : t.deleteConfirmText}
+                </p>
+                {!isGoogle && (
+                  <>
+                    <input type="password" className="form-input" required
+                      placeholder={t.currentPassword} value={deletePw}
+                      onChange={e => { setDeletePw(e.target.value); setPwError('') }} />
+                    {pwError && (
+                      <p style={{ fontSize: 13, color: '#dc2626', marginTop: 6 }}>{pwError}</p>
+                    )}
+                  </>
+                )}
+                <div className="sett-row-btns" style={{ marginTop: 12 }}>
                   <button type="submit" className="btn btn-danger"
-                    disabled={loading || !deletePw}>
+                    disabled={loading || (!isGoogle && !deletePw)}>
                     {loading ? t.deleting : t.confirmDeleteBtn}
                   </button>
                   <button type="button" className="btn btn-secondary"
-                    onClick={() => { setShowDelete(false); setDeletePw('') }}>
+                    onClick={() => { setShowDelete(false); setDeletePw(''); setPwError('') }}>
                     {t.cancel}
                   </button>
                 </div>
@@ -356,7 +311,6 @@ export default function Settings() {
             )
           )}
         </div>
-
         <div style={{ height: 110 }}/>
       </div>
     </div>
