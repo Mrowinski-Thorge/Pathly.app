@@ -32,9 +32,9 @@ export const AppProvider = ({ children }) => {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const fetchingRef  = useRef(false)
-  // Track if we're in the middle of a password-verify operation so we
-  // don't disrupt the UI when onAuthStateChange fires SIGNED_IN unexpectedly
   const suppressRef  = useRef(false)
+  // Track initial load to avoid double-fetch
+  const initializedRef = useRef(false)
 
   const lang = profile?.language || localLang()
   const t    = getT(lang)
@@ -66,7 +66,10 @@ export const AppProvider = ({ children }) => {
       if (cached) { setProfile(cached); return cached }
     }
     if (fetchingRef.current) {
-      await new Promise(r => setTimeout(r, 120))
+      // Wait briefly and return cached if available
+      const cached = readCache(userId)
+      if (cached) return cached
+      await new Promise(r => setTimeout(r, 100))
       if (fetchingRef.current) return null
     }
     fetchingRef.current = true
@@ -92,10 +95,12 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     let mounted = true
 
+    // Fast path: check session immediately
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!mounted) return
       const u = session?.user ?? null
       setUser(u)
+      initializedRef.current = true
       if (u) {
         loadProfile(u.id).finally(() => { if (mounted) setLoading(false) })
       } else {
@@ -107,11 +112,23 @@ export const AppProvider = ({ children }) => {
       async (event, session) => {
         if (!mounted) return
 
-        // Skip SIGNED_IN events that are triggered by internal password verification
-        // (Settings.jsx calls signInWithPassword just to check the password)
+        // Skip SIGNED_IN during password verification
         if (suppressRef.current && event === 'SIGNED_IN') return
 
         const u = session?.user ?? null
+
+        // On initial SIGNED_IN right after getSession, skip if already initialized
+        // to avoid double profile fetch
+        if (event === 'SIGNED_IN' && initializedRef.current && u?.id === user?.id) {
+          // Still update if email was just confirmed
+          if (u?.email_confirmed_at && !session?.user?.email_confirmed_at) {
+            setUser(u)
+            if (u) await loadProfile(u.id, true)
+          }
+          if (mounted) setLoading(false)
+          return
+        }
+
         setUser(u)
 
         if (u) {
@@ -124,6 +141,7 @@ export const AppProvider = ({ children }) => {
       }
     )
     return () => { mounted = false; subscription.unsubscribe() }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadProfile])
 
   const signUp = (email, password, captchaToken) =>
@@ -136,14 +154,12 @@ export const AppProvider = ({ children }) => {
 
   const updatePassword = (pw) => supabase.auth.updateUser({ password: pw })
 
-  // verifyPassword: suppress the SIGNED_IN event that signInWithPassword triggers
   const verifyPassword = async (password) => {
     if (!user?.email) return false
     suppressRef.current = true
     const { error } = await supabase.auth.signInWithPassword({
       email: user.email, password,
     })
-    // Allow a tick for the auth event to fire, then unsuppress
     setTimeout(() => { suppressRef.current = false }, 500)
     return !error
   }
