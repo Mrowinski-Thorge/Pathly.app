@@ -7,7 +7,6 @@
   padding: 20px;
   background: #fff;
   transition: background 0.3s;
-  /* Allow scrolling on small screens */
   overflow-y: auto;
 }
 body.dark-mode .auth-page { background: #000; }
@@ -26,7 +25,7 @@ body.dark-mode .theme-toggle-btn { background: rgba(255,255,255,.1); }
 .theme-toggle-btn svg { width: 20px; height: 20px; color: #000; }
 body.dark-mode .theme-toggle-btn svg { color: #fff; }
 
-/* Card – full width on mobile, max 390px */
+/* Card */
 .auth-card {
   width: 100%;
   max-width: 390px;
@@ -55,8 +54,33 @@ body.dark-mode .auth-sub { color: rgba(255,255,255,.5); }
 }
 body.dark-mode .auth-body { color: rgba(255,255,255,.65); }
 
-/* Verify */
-.verify-emoji { font-size: 2.8rem; text-align: center; margin-bottom: 14px; }
+/* Mail illustration */
+.mail-illustration {
+  display: flex; justify-content: center; margin-bottom: 16px;
+}
+.mail-sent-img {
+  width: 140px; height: 140px;
+  object-fit: contain;
+}
+
+/* Verify polling indicator */
+.verify-checking {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  font-size: 13px; color: rgba(0,0,0,.45);
+  margin-bottom: 14px;
+}
+body.dark-mode .verify-checking { color: rgba(255,255,255,.4); }
+.verify-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #000;
+  animation: verifyPulse 1.4s ease-in-out infinite;
+  flex-shrink: 0;
+}
+body.dark-mode .verify-dot { background: #fff; }
+@keyframes verifyPulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
 
 /* Forgot */
 .forgot-row { text-align: right; margin: 4px 0 14px; }
@@ -138,7 +162,7 @@ body.dark-mode .link-btn { color: rgba(255,255,255,.6); }
   .auth-card { padding: 26px 18px; }
 }
 
-/* Terms hint text (kein Checkbox) */
+/* Terms hint text */
 .terms-hint {
   font-size: 12px;
   color: rgba(0,0,0,.45);
@@ -147,5 +171,3 @@ body.dark-mode .link-btn { color: rgba(255,255,255,.6); }
   text-align: center;
 }
 body.dark-mode .terms-hint { color: rgba(255,255,255,.4); }
-.terms-link { color: #000; text-decoration: underline; }
-body.dark-mode .terms-link { color: #fff; }
