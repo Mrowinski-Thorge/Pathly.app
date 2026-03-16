@@ -12,21 +12,25 @@ export default function Onboarding() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!name.trim()) return
+    const trimmed = name.trim()
+    if (!trimmed) return
     setLoading(true)
     setError('')
-    const { error: err } = await updateProfile({
-      display_name: name.trim(),
+
+    const { data, error: err } = await updateProfile({
+      display_name: trimmed,
       onboarding_done: true,
     })
+
     if (err) {
       setError(err.message)
       setLoading(false)
-    } else {
-      // AppContext updates profile → App.jsx will redirect to /
-      // But navigate explicitly as fallback
-      navigate('/', { replace: true })
+      return
     }
+
+    // Profile updated in context (updateProfile calls setProfile internally)
+    // Navigate immediately – don't wait for React re-render cycle
+    navigate('/', { replace: true })
   }
 
   return (
