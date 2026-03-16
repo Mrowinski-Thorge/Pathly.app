@@ -44,9 +44,11 @@ function ProtectedRoute({ children }) {
   const { user, profile, loading } = useApp()
   if (loading) return <div className="loading-container"><div className="spinner" /></div>
   if (!user) return <Navigate to="/auth" replace />
+  // User logged in but onboarding not done → go to onboarding
   if (profile && !profile.onboarding_done) return <Navigate to="/onboarding" replace />
-  // If account is marked for deletion, show the DeletionModal overlay (rendered in AppLayout)
-  // but still allow access to protected routes so user can see the modal
+  // Profile still loading (null means we haven't fetched yet)
+  // If user exists but profile is null, might be new user — go to onboarding
+  if (profile === null) return <Navigate to="/onboarding" replace />
   return children
 }
 
@@ -55,7 +57,7 @@ function AppLayout({ children }) {
   const location = useLocation()
   const { user, profile } = useApp()
   const showNav = !!user && !!profile?.onboarding_done
-    && !!profile && !profile.deleted_at  // hide nav when deletion modal shown
+    && !profile?.deleted_at
     && location.pathname !== '/auth'
     && location.pathname !== '/onboarding'
 
@@ -71,22 +73,37 @@ function AppLayout({ children }) {
 /* ── Routes ──────────────────────────────────────────────────── */
 function AppRoutes() {
   const { user, profile, loading } = useApp()
+
   if (loading) return <div className="loading-container"><div className="spinner" /></div>
+
+  // Determine where a logged-in user should go
+  const getLoggedInRedirect = () => {
+    if (!user) return null
+    if (profile?.deleted_at) return null // Show deletion modal, stay on auth
+    if (!profile || !profile.onboarding_done) return '/onboarding'
+    return '/'
+  }
+
+  const loggedInRedirect = getLoggedInRedirect()
 
   return (
     <AppLayout>
       <Routes>
         <Route path="/auth"
           element={
-            // Only redirect away from /auth if user is logged in AND onboarding done
-            // AND account is NOT marked for deletion (deleted users should be signed out)
-            user && profile?.onboarding_done && !profile?.deleted_at
-              ? <Navigate to="/" replace />
+            loggedInRedirect
+              ? <Navigate to={loggedInRedirect} replace />
               : <Auth />
           }
         />
         <Route path="/onboarding"
-          element={!user ? <Navigate to="/auth" replace /> : <Onboarding />}
+          element={
+            !user
+              ? <Navigate to="/auth" replace />
+              : (profile?.onboarding_done
+                  ? <Navigate to="/" replace />
+                  : <Onboarding />)
+          }
         />
         <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
