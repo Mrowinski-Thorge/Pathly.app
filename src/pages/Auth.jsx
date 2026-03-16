@@ -4,54 +4,91 @@ import { supabase, turnstileSiteKey } from '../supabaseClient'
 import './Auth.css'
 
 // ─── Invisible Turnstile ──────────────────────────────────────────────────────
-// Widget wird einmalig beim Laden gerendert (unsichtbar, kein Klick nötig).
-// Token wird automatisch nach wenigen Sekunden geliefert.
-// Nach jeder Nutzung via reset() neues Token holen.
-
-let _widgetId  = null
-let _rendered  = false
-let _callbacks = { onToken: null, onExpire: null, onError: null }
+// Pre-execute on mount so token is ready when user clicks submit
+let _widgetId     = null
+let _rendered     = false
+let _pendingToken = null   // cache token until used
+let _callbacks    = { onToken: null, onExpire: null, onError: null }
 
 function initTurnstile(container) {
   if (_rendered || !window.turnstile || !container) return
   _rendered = true
   _widgetId = window.turnstile.render(container, {
     sitekey:  turnstileSiteKey,
-    size:     'invisible',            // ← unsichtbar
-    callback:           (tok) => _callbacks.onToken?.(tok),
-    'expired-callback': ()    => _callbacks.onExpire?.(),
-    'error-callback':   ()    => _callbacks.onError?.(),
+    size:     'invisible',
+    callback: (tok) => {
+      _pendingToken = tok
+      _callbacks.onToken?.(tok)
+    },
+    'expired-callback': () => {
+      _pendingToken = null
+      _callbacks.onExpire?.()
+    },
+    'error-callback': () => {
+      _pendingToken = null
+      _callbacks.onError?.()
+    },
   })
+  // Pre-execute immediately so token is ready
+  try { window.turnstile.execute(_widgetId) } catch (_) {}
 }
 
 function resetTurnstile() {
+  _pendingToken = null
   if (!window.turnstile || _widgetId === null) return
-  try { window.turnstile.reset(_widgetId) } catch (_) {}
+  try {
+    window.turnstile.reset(_widgetId)
+    // Re-execute after reset to get token ready for next action
+    setTimeout(() => {
+      try { window.turnstile.execute(_widgetId) } catch (_) {}
+    }, 300)
+  } catch (_) {}
 }
 
-// ─── Hook: liefert Token-Promise ─────────────────────────────────────────────
+// ─── Hook: liefert Token – sofort wenn bereits gecacht ───────────────────────
 function useCaptchaToken() {
   const getToken = useCallback(() => {
     return new Promise((resolve, reject) => {
+      // If we already have a fresh token, use it immediately (fast path)
+      if (_pendingToken) {
+        const tok = _pendingToken
+        _pendingToken = null
+        resolve(tok)
+        // Pre-fetch next token
+        resetTurnstile()
+        return
+      }
+
       if (!window.turnstile) { reject(new Error('Turnstile not loaded')); return }
-      _callbacks.onToken  = (tok) => { resolve(tok) }
+
+      _callbacks.onToken  = (tok) => { _pendingToken = null; resolve(tok) }
       _callbacks.onError  = ()    => { reject(new Error('captcha_error')) }
       _callbacks.onExpire = ()    => { reject(new Error('captcha_expired')) }
-      resetTurnstile()
-      // execute() triggert den invisible widget sofort
-      try { window.turnstile.execute(_widgetId) } catch (e) {
-        // Falls execute nicht nötig ist (auto-execute), Token kommt trotzdem
-      }
+
+      try { window.turnstile.execute(_widgetId) } catch (_) {}
     })
   }, [])
   return getToken
 }
 
+// ─── Mail Sent SVG (from Supabase) ───────────────────────────────────────────
+function MailSentIllustration() {
+  return (
+    <div className="mail-illustration">
+      <img
+        src="https://lmmnwgtcdjyiktobsere.supabase.co/storage/v1/object/public/Aichieve_Public_Assets/Website/mail_send.svg"
+        alt="Mail sent"
+        className="mail-sent-img"
+        loading="eager"
+      />
+    </div>
+  )
+}
+
 // ─── Haupt-Komponente ─────────────────────────────────────────────────────────
 export default function Auth() {
-  const { signUp, t } = useApp()
+  const { signUp, t, user, profile, loading: appLoading } = useApp()
 
-  // step: 'login' | 'register' | 'verify' | 'reset_email'
   const [step,     setStep]     = useState('login')
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
@@ -59,23 +96,55 @@ export default function Auth() {
   const [msg,      setMsg]      = useState({ type: '', text: '' })
   const [isDark,   setIsDark]   = useState(() => document.body.classList.contains('dark-mode'))
   const [cooldown, setCooldown] = useState(0)
+  // Track if we're on verify step and waiting for email confirmation
+  const [checkingVerify, setCheckingVerify] = useState(false)
 
-  const containerRef = useRef(null)
-  const cooldownRef  = useRef(null)
+  const containerRef  = useRef(null)
+  const cooldownRef   = useRef(null)
+  const verifyPollRef = useRef(null)
   const getCaptchaToken = useCaptchaToken()
 
-  // Turnstile beim ersten Render initialisieren
+  // Init Turnstile immediately on mount
   useEffect(() => {
-    const interval = setInterval(() => {
+    const tryInit = () => {
       if (window.turnstile && containerRef.current) {
         initTurnstile(containerRef.current)
-        clearInterval(interval)
+        return true
       }
-    }, 100)
-    return () => clearInterval(interval)
+      return false
+    }
+    if (!tryInit()) {
+      const interval = setInterval(() => {
+        if (tryInit()) clearInterval(interval)
+      }, 50)
+      return () => clearInterval(interval)
+    }
   }, [])
 
-  useEffect(() => () => clearInterval(cooldownRef.current), [])
+  useEffect(() => () => {
+    clearInterval(cooldownRef.current)
+    clearInterval(verifyPollRef.current)
+  }, [])
+
+  // Poll for email verification when on verify step
+  useEffect(() => {
+    if (step !== 'verify') {
+      clearInterval(verifyPollRef.current)
+      return
+    }
+    // Poll every 2 seconds to check if email is confirmed
+    setCheckingVerify(true)
+    verifyPollRef.current = setInterval(async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user?.email_confirmed_at) {
+        clearInterval(verifyPollRef.current)
+        // Session exists and email confirmed → AppContext will handle redirect
+        // Refresh session to trigger onAuthStateChange
+        await supabase.auth.refreshSession()
+      }
+    }, 2000)
+    return () => clearInterval(verifyPollRef.current)
+  }, [step])
 
   const goTo = (s) => { setStep(s); setMsg({ type: '', text: '' }) }
 
@@ -83,17 +152,18 @@ export default function Auth() {
     const dark = document.body.classList.toggle('dark-mode')
     setIsDark(dark)
     try { localStorage.setItem('theme', dark ? 'dark' : 'light') } catch (_) {}
-    // Theme-Update beim invisible widget nicht nötig
   }
 
   const startCooldown = () => {
     setCooldown(60)
     cooldownRef.current = setInterval(() => {
-      setCooldown(v => { if (v <= 1) { clearInterval(cooldownRef.current); return 0 } return v - 1 })
+      setCooldown(v => {
+        if (v <= 1) { clearInterval(cooldownRef.current); return 0 }
+        return v - 1
+      })
     }, 1000)
   }
 
-  // ── Captcha holen (mit Fehlerbehandlung) ──────────────────────────────────
   const withCaptcha = async (fn) => {
     setLoading(true); setMsg({ type: '', text: '' })
     let token
@@ -108,7 +178,6 @@ export default function Auth() {
     setLoading(false)
   }
 
-  // ── Google OAuth ──────────────────────────────────────────────────────────
   const handleGoogle = async () => {
     setMsg({ type: '', text: '' })
     const { error } = await supabase.auth.signInWithOAuth({
@@ -121,7 +190,6 @@ export default function Auth() {
     if (error) setMsg({ type: 'error', text: error.message })
   }
 
-  // ── Login ─────────────────────────────────────────────────────────────────
   const handleLogin = (e) => {
     e.preventDefault()
     withCaptcha(async (token) => {
@@ -129,11 +197,9 @@ export default function Auth() {
         email, password, options: { captchaToken: token },
       })
       if (error) setMsg({ type: 'error', text: error.message })
-      // Erfolg → AppContext SIGNED_IN → App.jsx redirect
     })
   }
 
-  // ── Registrierung ─────────────────────────────────────────────────────────
   const handleRegister = (e) => {
     e.preventDefault()
     withCaptcha(async (token) => {
@@ -143,7 +209,6 @@ export default function Auth() {
     })
   }
 
-  // ── Passwort zurücksetzen ─────────────────────────────────────────────────
   const handleResetStep1 = (e) => { e.preventDefault(); goTo('reset_captcha') }
 
   const handleReset = (e) => {
@@ -158,7 +223,6 @@ export default function Auth() {
     })
   }
 
-  // ── E-Mail erneut senden ──────────────────────────────────────────────────
   const handleResend = async () => {
     if (cooldown > 0 || !email) return
     const { error } = await supabase.auth.resend({ type: 'signup', email })
@@ -166,7 +230,7 @@ export default function Auth() {
     else setMsg({ type: 'error', text: error.message })
   }
 
-  // ── Invisible Turnstile Container (immer im DOM) ──────────────────────────
+  // Invisible Turnstile container – always in DOM
   const turnstileEl = (
     <div
       ref={containerRef}
@@ -180,9 +244,14 @@ export default function Auth() {
       {turnstileEl}
       <ThemeBtn isDark={isDark} onToggle={toggleTheme} />
       <div className="auth-card card">
-        <div className="verify-emoji">✉️</div>
+        <MailSentIllustration />
         <h1 className="auth-title">{t.verifyTitle}</h1>
         <p className="auth-body">{t.verifyText}</p>
+        {checkingVerify && (
+          <div className="verify-checking">
+            <span className="verify-dot" />{t.verifyChecking || 'Warte auf Bestätigung…'}
+          </div>
+        )}
         {msg.text && <div className={`alert alert-${msg.type}`}>{msg.text}</div>}
         <button className="btn btn-outline btn-full"
           onClick={handleResend} disabled={cooldown > 0} style={{ marginBottom: 10 }}>
