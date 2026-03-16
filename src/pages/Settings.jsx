@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../AppContext'
-import { supabase } from '../supabaseClient'
 import './Settings.css'
 
 export default function Settings() {
   const {
     user, profile, t, lang,
     updateProfile, signOut, updatePassword,
-    markForDeletion, cancelDeletion, loadProfile
+    markForDeletion, cancelDeletion, loadProfile,
+    verifyPassword,
   } = useApp()
   const navigate = useNavigate()
 
@@ -20,7 +20,6 @@ export default function Settings() {
   const [confirmPw, setConfirmPw] = useState('')
   const [showDelete, setShowDelete] = useState(false)
   const [deletePw, setDeletePw] = useState('')
-  const [deleteStep, setDeleteStep] = useState('confirm') // 'confirm' | 'password'
   const [loading, setLoading]   = useState(false)
   const [pwError, setPwError]   = useState('')
 
@@ -51,76 +50,64 @@ export default function Settings() {
     setLoading(false)
   }
 
-  // ── Account löschen: Schritt 1 für Email-User – Passwort prüfen ───────────
-  const verifyAndProceed = async (e) => {
-    e.preventDefault()
-    if (!deletePw) return
-    setPwError('')
+  // ── Konto tatsächlich löschen ──────────────────────────────────────────────
+  const doDelete = async () => {
     setLoading(true)
-
-    // Direkt via Supabase prüfen – OHNE onAuthStateChange zu triggern
-    // indem wir fetchAndThrow nutzen statt die JS-Methode
-    const { error } = await supabase.auth.signInWithPassword({
-      email: user.email,
-      password: deletePw,
-    })
-
+    const { error: rpcErr } = await markForDeletion()
+    if (rpcErr) {
+      notify('error', rpcErr.message || t.markFailedError)
+      setLoading(false)
+      return
+    }
+    await loadProfile(user.id, true)
     setLoading(false)
+    await signOut()
+  }
 
-    if (error) {
-      setPwError(t.wrongPassword)
+  // ── Formular Submit: Passwort prüfen (nur Email-User) dann löschen ─────────
+  const handleDeleteSubmit = async (e) => {
+    e.preventDefault()
+    setPwError('')
+
+    if (isGoogle) {
+      // Google-User: direkt löschen, kein Passwort nötig
+      await doDelete()
       return
     }
 
-    // Passwort korrekt → zum Bestätigungs-Schritt
-    setDeleteStep('confirm')
-    doDelete()
-  }
-
-  // ── Account tatsächlich löschen ───────────────────────────────────────────
-  const doDelete = async () => {
+    // Email-User: Passwort verifizieren
+    if (!deletePw) return
     setLoading(true)
 
-    const { error: rpcErr } = await markForDeletion()
-    if (rpcErr) {
-      notify('error', rpcErr.message)
+    const ok = await verifyPassword(deletePw)
+    if (!ok) {
+      setPwError(t.wrongPassword)
       setLoading(false)
       return
     }
 
-    // Profil neu laden
-    await loadProfile(user.id, true)
-    setLoading(false)
-
-    // Abmelden – nach dem Logout zeigt /auth den normalen Anmeldescreen
-    // (deleted_at ist jetzt gesetzt, beim nächsten Login kommt DeletionModal)
-    await signOut()
-  }
-
-  // ── Löschung starten ──────────────────────────────────────────────────────
-  const handleDeleteClick = (e) => {
-    e.preventDefault()
-    if (isGoogle) {
-      // Google-User: direkt löschen (kein Passwort)
-      doDelete()
-    } else {
-      // Email-User: erst Passwort prüfen
-      verifyAndProceed(e)
-    }
+    // Passwort korrekt → löschen
+    await doDelete()
   }
 
   const cancelDel = async () => {
     setLoading(true)
     const { error } = await cancelDeletion()
     if (error) notify('error', error.message)
-    else { await loadProfile(user.id, true); notify('success', t.deletionCancelledMsg); setShowDelete(false) }
+    else {
+      await loadProfile(user.id, true)
+      notify('success', t.deletionCancelledMsg)
+      setShowDelete(false)
+    }
     setLoading(false)
   }
 
   const delDate = profile?.deleted_at ? (() => {
     const d = new Date(profile.deleted_at)
     d.setDate(d.getDate() + 30)
-    return d.toLocaleDateString(lang === 'en' ? 'en-GB' : 'de-DE', { day:'2-digit', month:'2-digit', year:'numeric' })
+    return d.toLocaleDateString(lang === 'en' ? 'en-GB' : 'de-DE', {
+      day: '2-digit', month: '2-digit', year: 'numeric'
+    })
   })() : ''
 
   const theme = profile?.theme || 'system'
@@ -140,7 +127,11 @@ export default function Settings() {
       </div>
 
       <div className="sett-scroll">
-        {msg.text && <div className={`alert alert-${msg.type}`} style={{margin:'0 0 16px'}}>{msg.text}</div>}
+        {msg.text && (
+          <div className={`alert alert-${msg.type}`} style={{margin:'0 0 16px'}}>
+            {msg.text}
+          </div>
+        )}
 
         <p className="sett-section-lbl">{t.general}</p>
         <div className="sett-card card">
@@ -180,8 +171,10 @@ export default function Settings() {
             <SIcon><GlobeIcon/></SIcon>
             <div className="sett-info"><span className="sett-lbl">{t.language}</span></div>
             <div className="seg">
-              <button className={`seg-btn${lng==='de'?' seg-on':''}`} onClick={() => updateProfile({ language:'de' })}>DE</button>
-              <button className={`seg-btn${lng==='en'?' seg-on':''}`} onClick={() => updateProfile({ language:'en' })}>EN</button>
+              <button className={`seg-btn${lng==='de'?' seg-on':''}`}
+                onClick={() => updateProfile({ language:'de' })}>DE</button>
+              <button className={`seg-btn${lng==='en'?' seg-on':''}`}
+                onClick={() => updateProfile({ language:'en' })}>EN</button>
             </div>
           </div>
 
@@ -192,9 +185,12 @@ export default function Settings() {
             <SIcon><MoonIcon/></SIcon>
             <div className="sett-info"><span className="sett-lbl">{t.appearance}</span></div>
             <div className="seg">
-              <button className={`seg-btn${theme==='light'?' seg-on':''}`} onClick={() => updateProfile({ theme:'light' })}>{t.light}</button>
-              <button className={`seg-btn${theme==='system'?' seg-on':''}`} onClick={() => updateProfile({ theme:'system' })}>{t.system}</button>
-              <button className={`seg-btn${theme==='dark'?' seg-on':''}`} onClick={() => updateProfile({ theme:'dark' })}>{t.dark}</button>
+              <button className={`seg-btn${theme==='light'?' seg-on':''}`}
+                onClick={() => updateProfile({ theme:'light' })}>{t.light}</button>
+              <button className={`seg-btn${theme==='system'?' seg-on':''}`}
+                onClick={() => updateProfile({ theme:'system' })}>{t.system}</button>
+              <button className={`seg-btn${theme==='dark'?' seg-on':''}`}
+                onClick={() => updateProfile({ theme:'dark' })}>{t.dark}</button>
             </div>
           </div>
         </div>
@@ -218,7 +214,9 @@ export default function Settings() {
             <SIcon><LockIcon/></SIcon>
             <div className="sett-info">
               <span className="sett-lbl">{t.changePassword}</span>
-              <span className="sett-desc">{isGoogle ? t.linkedWithGoogle : t.changePasswordDesc}</span>
+              <span className="sett-desc">
+                {isGoogle ? t.linkedWithGoogle : t.changePasswordDesc}
+              </span>
             </div>
             {!isGoogle && !editPw && (
               <button className="sett-pill" onClick={() => setEditPw(true)}>{t.change}</button>
@@ -252,7 +250,9 @@ export default function Settings() {
               <span className="sett-lbl">{t.signOut}</span>
               <span className="sett-desc">{t.signOutDesc}</span>
             </div>
-            <button className="sett-pill sett-pill-danger" onClick={signOut}>{t.signOut}</button>
+            <button className="sett-pill sett-pill-danger" onClick={signOut}>
+              {t.signOut}
+            </button>
           </div>
 
           <div className="sett-divider"/>
@@ -262,9 +262,12 @@ export default function Settings() {
             <SIcon danger><TrashIcon/></SIcon>
             <div className="sett-info">
               <span className="sett-lbl">{t.deleteAccount}</span>
-              <span className="sett-desc">{isDel ? t.deletionScheduledDesc(delDate) : t.deleteAccountDesc}</span>
+              <span className="sett-desc">
+                {isDel ? t.deletionScheduledDesc(delDate) : t.deleteAccountDesc}
+              </span>
             </div>
-            <button className="sett-pill sett-pill-danger" onClick={() => { setShowDelete(!showDelete); setDeletePw(''); setPwError('') }}>
+            <button className="sett-pill sett-pill-danger"
+              onClick={() => { setShowDelete(!showDelete); setDeletePw(''); setPwError('') }}>
               {isDel ? t.viewStatus : t.deleteAccount}
             </button>
           </div>
@@ -278,15 +281,17 @@ export default function Settings() {
                   <button className="btn btn-primary" disabled={loading} onClick={cancelDel}>
                     {loading ? '…' : t.cancelDeletion}
                   </button>
-                  <button className="btn btn-secondary" onClick={() => setShowDelete(false)}>{t.cancel}</button>
+                  <button className="btn btn-secondary"
+                    onClick={() => setShowDelete(false)}>{t.cancel}</button>
                 </div>
               </div>
             ) : (
-              <form className="sett-expand" onSubmit={handleDeleteClick}>
+              <form className="sett-expand" onSubmit={handleDeleteSubmit}>
                 <div className="sett-warn-icon"><WarnIcon/></div>
                 <p className="sett-expand-desc">
                   {isGoogle ? t.deleteConfirmTextGoogle : t.deleteConfirmText}
                 </p>
+                {/* Passwortfeld NUR für Email-User */}
                 {!isGoogle && (
                   <>
                     <input type="password" className="form-input" required
@@ -320,6 +325,7 @@ export default function Settings() {
 function SIcon({ children, danger }) {
   return <div className={`sett-icon${danger ? ' sett-icon-danger' : ''}`}>{children}</div>
 }
+
 const PersonIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
 const GlobeIcon  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/></svg>
 const MoonIcon   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
