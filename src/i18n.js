@@ -27,6 +27,7 @@ const de = {
   // Verify
   verifyTitle: 'E-Mail bestätigen',
   verifyText: 'Wir haben dir eine Bestätigungs-E-Mail geschickt. Bitte bestätige deine Adresse, um fortzufahren.',
+  verifyChecking: 'Warte auf Bestätigung…',
   backToLogin: 'Zurück zur Anmeldung',
   resendEmail: 'E-Mail erneut senden',
   resendIn: 'Erneut senden in',
@@ -103,6 +104,7 @@ const en = {
   signUpWithGoogle: 'Sign up with Google',
   verifyTitle: 'Verify your Email',
   verifyText: "We've sent you a confirmation email. Please verify your address to continue.",
+  verifyChecking: 'Waiting for confirmation…',
   backToLogin: 'Back to sign in',
   resendEmail: 'Resend Email',
   resendIn: 'Resend in',
