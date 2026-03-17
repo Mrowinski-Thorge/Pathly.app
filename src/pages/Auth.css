@@ -1,5 +1,10 @@
+/* ── Auth Page – scrollbar aktiviert ────────────────────────────────────── */
+/* position:fixed + overflow-y:auto umgeht das html/body overflow:hidden     */
 .auth-page {
-  min-height: 100vh;
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -53,7 +58,7 @@ body.dark-mode .auth-sub { color: rgba(255,255,255,.5); }
 }
 body.dark-mode .auth-body { color: rgba(255,255,255,.65); }
 
-/* Mail illustration */
+/* ── Mail Illustration ───────────────────────────────────────────────────── */
 .mail-illustration {
   display: flex; justify-content: center; margin-bottom: 16px;
 }
@@ -62,46 +67,41 @@ body.dark-mode .auth-body { color: rgba(255,255,255,.65); }
   object-fit: contain;
 }
 
-/* Verify polling indicator */
-.verify-checking {
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  font-size: 13px; color: rgba(0,0,0,.45);
-  margin-bottom: 14px;
-}
-body.dark-mode .verify-checking { color: rgba(255,255,255,.4); }
-.verify-dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: #000;
-  animation: verifyPulse 1.4s ease-in-out infinite;
-  flex-shrink: 0;
-}
-body.dark-mode .verify-dot { background: #fff; }
-@keyframes verifyPulse {
-  0%, 100% { opacity: 0.3; transform: scale(0.8); }
-  50% { opacity: 1; transform: scale(1.1); }
-}
-
-/* Verify success indicator */
-.verify-success {
+/* ── Verify Status Indicator ─────────────────────────────────────────────── */
+.verify-status {
   display: flex; align-items: center; justify-content: center; gap: 8px;
   font-size: 13px; font-weight: 500;
-  color: #16a34a;
+  color: rgba(0,0,0,.45);
   margin-bottom: 14px;
-  padding: 8px 16px;
-  background: rgba(22, 163, 74, 0.1);
-  border-radius: 8px;
+  transition: color 0.4s ease;
 }
-body.dark-mode .verify-success {
-  color: #4ade80;
-  background: rgba(74, 222, 128, 0.15);
+body.dark-mode .verify-status { color: rgba(255,255,255,.4); }
+
+/* Bestätigt: grün */
+.verify-status--confirmed {
+  color: #16a34a;
 }
-.verify-check {
-  font-size: 18px;
-  font-weight: 700;
-  flex-shrink: 0;
+body.dark-mode .verify-status--confirmed { color: #4ade80; }
+
+.verify-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  background: currentColor;
+  animation: verifyPulse 1.4s ease-in-out infinite;
+  transition: background 0.4s;
+}
+/* Bestätigt: kein Pulsieren, statisch grün */
+.verify-status--confirmed .verify-dot {
+  animation: none;
+  background: #16a34a;
+}
+body.dark-mode .verify-status--confirmed .verify-dot { background: #4ade80; }
+
+@keyframes verifyPulse {
+  0%, 100% { opacity: 0.35; transform: scale(0.8); }
+  50%       { opacity: 1;    transform: scale(1.15); }
 }
 
-/* Forgot */
+/* ── Forgot ──────────────────────────────────────────────────────────────── */
 .forgot-row { text-align: right; margin: 4px 0 14px; }
 .link-btn-sm {
   background: none; border: none; cursor: pointer;
@@ -110,22 +110,7 @@ body.dark-mode .verify-success {
 }
 body.dark-mode .link-btn-sm { color: rgba(255,255,255,.5); }
 
-/* Terms */
-.terms-row {
-  display: flex; align-items: flex-start; gap: 9px;
-  margin-bottom: 14px; cursor: pointer;
-  font-size: 13px; color: rgba(0,0,0,.6); line-height: 1.4;
-}
-body.dark-mode .terms-row { color: rgba(255,255,255,.6); }
-.terms-row input[type=checkbox] {
-  width: 15px; height: 15px; flex-shrink: 0; margin-top: 2px;
-  accent-color: #000; cursor: pointer;
-}
-body.dark-mode .terms-row input[type=checkbox] { accent-color: #fff; }
-.terms-link { color: #000; text-decoration: underline; }
-body.dark-mode .terms-link { color: #fff; }
-
-/* Divider */
+/* ── Divider ─────────────────────────────────────────────────────────────── */
 .auth-divider {
   display: flex; align-items: center; gap: 12px;
   margin: 14px 0; color: rgba(0,0,0,.35); font-size: 12px;
@@ -137,7 +122,7 @@ body.dark-mode .auth-divider { color: rgba(255,255,255,.35); }
 body.dark-mode .auth-divider::before,
 body.dark-mode .auth-divider::after { background: rgba(255,255,255,.1); }
 
-/* Google button */
+/* ── Google button ───────────────────────────────────────────────────────── */
 .btn-google {
   background: #fff !important;
   border: 1.5px solid rgba(0,0,0,.14) !important;
@@ -153,7 +138,7 @@ body.dark-mode .btn-google {
 }
 body.dark-mode .btn-google:hover { background: #2a2a2a !important; }
 
-/* Outline button */
+/* ── Outline button ──────────────────────────────────────────────────────── */
 .btn-outline {
   background: transparent;
   border: 1.5px solid rgba(0,0,0,.18) !important;
@@ -164,7 +149,7 @@ body.dark-mode .btn-outline {
 }
 .btn-outline:disabled { opacity: 0.45; cursor: not-allowed; }
 
-/* Footer */
+/* ── Footer ──────────────────────────────────────────────────────────────── */
 .auth-footer {
   text-align: center; margin-top: 18px; padding-top: 16px;
   border-top: 1px solid rgba(0,0,0,.07);
@@ -177,16 +162,15 @@ body.dark-mode .auth-footer { border-top-color: rgba(255,255,255,.08); }
 }
 body.dark-mode .link-btn { color: rgba(255,255,255,.6); }
 
+/* ── Terms hint ──────────────────────────────────────────────────────────── */
+.terms-hint {
+  font-size: 12px; color: rgba(0,0,0,.45);
+  line-height: 1.5; margin-bottom: 14px; text-align: center;
+}
+body.dark-mode .terms-hint { color: rgba(255,255,255,.4); }
+.terms-link { color: #000; text-decoration: underline; }
+body.dark-mode .terms-link { color: #fff; }
+
 @media (max-width: 430px) {
   .auth-card { padding: 26px 18px; }
 }
-
-/* Terms hint text */
-.terms-hint {
-  font-size: 12px;
-  color: rgba(0,0,0,.45);
-  line-height: 1.5;
-  margin-bottom: 14px;
-  text-align: center;
-}
-body.dark-mode .terms-hint { color: rgba(255,255,255,.4); }
