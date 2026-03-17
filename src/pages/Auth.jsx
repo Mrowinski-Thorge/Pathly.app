@@ -98,6 +98,8 @@ export default function Auth() {
   const [cooldown, setCooldown] = useState(0)
   // Track if we're on verify step and waiting for email confirmation
   const [checkingVerify, setCheckingVerify] = useState(false)
+  // Track if email was verified successfully
+  const [emailVerified, setEmailVerified] = useState(false)
 
   const containerRef  = useRef(null)
   const cooldownRef   = useRef(null)
@@ -130,16 +132,20 @@ export default function Auth() {
   useEffect(() => {
     if (step !== 'verify') {
       clearInterval(verifyPollRef.current)
+      setEmailVerified(false)
       return
     }
     // Poll every 2 seconds to check if email is confirmed
     setCheckingVerify(true)
+    setEmailVerified(false)
     verifyPollRef.current = setInterval(async () => {
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.user?.email_confirmed_at) {
         clearInterval(verifyPollRef.current)
+        setCheckingVerify(false)
+        setEmailVerified(true)
         // Session exists and email confirmed → AppContext will handle redirect
-        // Refresh session to trigger onAuthStateChange
+        // Refresh session to trigger onAuthStateChange which will redirect appropriately
         await supabase.auth.refreshSession()
       }
     }, 2000)
@@ -226,8 +232,16 @@ export default function Auth() {
   const handleResend = async () => {
     if (cooldown > 0 || !email) return
     const { error } = await supabase.auth.resend({ type: 'signup', email })
-    if (!error) { setMsg({ type: 'success', text: t.resendSuccess }); startCooldown() }
-    else setMsg({ type: 'error', text: error.message })
+    if (!error) {
+      setMsg({ type: 'success', text: t.resendSuccess })
+      startCooldown()
+    } else {
+      // Check if it's a rate limit error from server
+      const isRateLimit = error.message?.toLowerCase().includes('rate') ||
+                          error.message?.toLowerCase().includes('too many') ||
+                          error.status === 429
+      setMsg({ type: 'error', text: isRateLimit ? t.rateLimitError : error.message })
+    }
   }
 
   // Invisible Turnstile container – always in DOM
@@ -247,14 +261,19 @@ export default function Auth() {
         <MailSentIllustration />
         <h1 className="auth-title">{t.verifyTitle}</h1>
         <p className="auth-body">{t.verifyText}</p>
-        {checkingVerify && (
+        {checkingVerify && !emailVerified && (
           <div className="verify-checking">
             <span className="verify-dot" />{t.verifyChecking || 'Warte auf Bestätigung…'}
           </div>
         )}
+        {emailVerified && (
+          <div className="verify-success">
+            <span className="verify-check">✓</span>{t.verifySuccess || 'Erfolgreich bestätigt!'}
+          </div>
+        )}
         {msg.text && <div className={`alert alert-${msg.type}`}>{msg.text}</div>}
         <button className="btn btn-outline btn-full"
-          onClick={handleResend} disabled={cooldown > 0} style={{ marginBottom: 10 }}>
+          onClick={handleResend} disabled={cooldown > 0 || emailVerified} style={{ marginBottom: 10 }}>
           {cooldown > 0 ? `${t.resendIn} ${cooldown}s` : t.resendEmail}
         </button>
         <button className="btn btn-primary btn-full" onClick={() => goTo('login')}>

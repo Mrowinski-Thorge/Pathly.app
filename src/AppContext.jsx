@@ -156,12 +156,30 @@ export const AppProvider = ({ children }) => {
 
   const verifyPassword = async (password) => {
     if (!user?.email) return false
+
+    // Store current session to restore after verification
+    const { data: { session: currentSession } } = await supabase.auth.getSession()
+
     suppressRef.current = true
-    const { error } = await supabase.auth.signInWithPassword({
-      email: user.email, password,
-    })
-    setTimeout(() => { suppressRef.current = false }, 500)
-    return !error
+    try {
+      // Try to sign in with the provided password
+      const { error } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password,
+      })
+
+      // Restore the original session if we had one
+      if (currentSession && !error) {
+        await supabase.auth.setSession({
+          access_token: currentSession.access_token,
+          refresh_token: currentSession.refresh_token,
+        })
+      }
+
+      return !error
+    } finally {
+      setTimeout(() => { suppressRef.current = false }, 500)
+    }
   }
 
   const updateProfile = async (updates) => {

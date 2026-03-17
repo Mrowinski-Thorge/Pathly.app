@@ -7,7 +7,6 @@
   padding: 20px;
   background: #fff;
   transition: background 0.3s;
-  overflow-y: auto;
 }
 body.dark-mode .auth-page { background: #000; }
 
@@ -80,6 +79,26 @@ body.dark-mode .verify-dot { background: #fff; }
 @keyframes verifyPulse {
   0%, 100% { opacity: 0.3; transform: scale(0.8); }
   50% { opacity: 1; transform: scale(1.1); }
+}
+
+/* Verify success indicator */
+.verify-success {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  font-size: 13px; font-weight: 500;
+  color: #16a34a;
+  margin-bottom: 14px;
+  padding: 8px 16px;
+  background: rgba(22, 163, 74, 0.1);
+  border-radius: 8px;
+}
+body.dark-mode .verify-success {
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.15);
+}
+.verify-check {
+  font-size: 18px;
+  font-weight: 700;
+  flex-shrink: 0;
 }
 
 /* Forgot */
