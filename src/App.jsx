@@ -1,5 +1,7 @@
+import { useEffect, useRef } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AppProvider, useApp } from './AppContext'
+import { initTurnstile } from './turnstile'
 import Auth from './pages/Auth'
 import Onboarding from './pages/Onboarding'
 import Home from './pages/Home'
@@ -7,7 +9,33 @@ import Settings from './pages/Settings'
 import BottomNav from './components/BottomNav'
 import './App.css'
 
-/* ── Deletion-Restoration Modal ─────────────────────────────── */
+/* ── Globaler Turnstile-Container ────────────────────────────── */
+// Einmal global rendern, damit getCaptchaToken() überall funktioniert
+// (auch in Settings für Passwort-Verifikation)
+function GlobalTurnstile() {
+  const containerRef = useRef(null)
+  useEffect(() => {
+    const tryInit = () => {
+      if (window.turnstile && containerRef.current) {
+        initTurnstile(containerRef.current)
+        return true
+      }
+      return false
+    }
+    if (!tryInit()) {
+      const id = setInterval(() => { if (tryInit()) clearInterval(id) }, 50)
+      return () => clearInterval(id)
+    }
+  }, [])
+  return (
+    <div
+      ref={containerRef}
+      style={{ position: 'fixed', bottom: 0, right: 0, zIndex: -1, opacity: 0, pointerEvents: 'none' }}
+    />
+  )
+}
+
+/* ── Deletion Modal ──────────────────────────────────────────── */
 function DeletionModal() {
   const { profile, t, lang, restoreAccount, keepAndSignOut } = useApp()
   if (!profile?.deleted_at) return null
@@ -15,7 +43,7 @@ function DeletionModal() {
   const d = new Date(profile.deleted_at)
   d.setDate(d.getDate() + 30)
   const formatted = d.toLocaleDateString(lang === 'en' ? 'en-GB' : 'de-DE', {
-    day: '2-digit', month: '2-digit', year: 'numeric'
+    day: '2-digit', month: '2-digit', year: 'numeric',
   })
 
   return (
@@ -41,14 +69,20 @@ function DeletionModal() {
 
 /* ── Route guard ─────────────────────────────────────────────── */
 function ProtectedRoute({ children }) {
-  const { user, profile, loading } = useApp()
+  const { user, profile, loading, profileLoaded } = useApp()
+
+  // Initiales Laden: Spinner zeigen
   if (loading) return <div className="loading-container"><div className="spinner" /></div>
+
+  // Nicht eingeloggt
   if (!user) return <Navigate to="/auth" replace />
-  // User logged in but onboarding not done → go to onboarding
-  if (profile && !profile.onboarding_done) return <Navigate to="/onboarding" replace />
-  // Profile still loading (null means we haven't fetched yet)
-  // If user exists but profile is null, might be new user — go to onboarding
-  if (profile === null) return <Navigate to="/onboarding" replace />
+
+  // Profil noch nicht geladen (verhindert Flash zu /onboarding)
+  if (!profileLoaded) return <div className="loading-container"><div className="spinner" /></div>
+
+  // Onboarding nicht abgeschlossen
+  if (!profile?.onboarding_done) return <Navigate to="/onboarding" replace />
+
   return children
 }
 
@@ -56,7 +90,8 @@ function ProtectedRoute({ children }) {
 function AppLayout({ children }) {
   const location = useLocation()
   const { user, profile } = useApp()
-  const showNav = !!user && !!profile?.onboarding_done
+  const showNav = !!user
+    && !!profile?.onboarding_done
     && !profile?.deleted_at
     && location.pathname !== '/auth'
     && location.pathname !== '/onboarding'
@@ -72,31 +107,32 @@ function AppLayout({ children }) {
 
 /* ── Routes ──────────────────────────────────────────────────── */
 function AppRoutes() {
-  const { user, profile, loading } = useApp()
+  const { user, profile, loading, profileLoaded } = useApp()
 
   if (loading) return <div className="loading-container"><div className="spinner" /></div>
 
-  // Determine where a logged-in user should go
-  const getLoggedInRedirect = () => {
+  // Wohin soll ein eingeloggter User geleitet werden?
+  const loggedInTarget = () => {
     if (!user) return null
-    if (profile?.deleted_at) return null // Show deletion modal, stay on auth
-    if (!profile || !profile.onboarding_done) return '/onboarding'
+    if (profile?.deleted_at) return null       // DeletionModal zeigen
+    if (!profileLoaded) return null            // noch laden
+    if (!profile?.onboarding_done) return '/onboarding'
     return '/'
   }
-
-  const loggedInRedirect = getLoggedInRedirect()
+  const target = loggedInTarget()
 
   return (
     <AppLayout>
       <Routes>
-        <Route path="/auth"
-          element={
-            loggedInRedirect
-              ? <Navigate to={loggedInRedirect} replace />
-              : <Auth />
-          }
+        {/* Auth-Seite */}
+        <Route
+          path="/auth"
+          element={target ? <Navigate to={target} replace /> : <Auth />}
         />
-        <Route path="/onboarding"
+
+        {/* Onboarding – nur wenn eingeloggt und noch nicht abgeschlossen */}
+        <Route
+          path="/onboarding"
           element={
             !user
               ? <Navigate to="/auth" replace />
@@ -105,9 +141,11 @@ function AppRoutes() {
                   : <Onboarding />)
           }
         />
-        <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+
+        {/* Geschützte Routen */}
+        <Route path="/"        element={<ProtectedRoute><Home /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*"        element={<Navigate to="/" replace />} />
       </Routes>
     </AppLayout>
   )
@@ -116,6 +154,7 @@ function AppRoutes() {
 export default function App() {
   return (
     <AppProvider>
+      <GlobalTurnstile />
       <BrowserRouter basename="/Pathly.app">
         <AppRoutes />
       </BrowserRouter>
