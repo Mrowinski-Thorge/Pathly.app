@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from './supabaseClient'
 import { getT } from './i18n'
+import { getCaptchaToken } from './turnstile'
 
 const AppContext = createContext({})
 export const useApp = () => useContext(AppContext)
@@ -14,59 +15,46 @@ function localLang() {
   try { return localStorage.getItem('lang') || 'de' } catch { return 'de' }
 }
 const CACHE_KEY = 'pathly_profile'
-function readCache(userId) {
-  try {
-    const c = JSON.parse(sessionStorage.getItem(CACHE_KEY))
-    return c?.id === userId ? c : null
-  } catch { return null }
+function readCache(uid) {
+  try { const c = JSON.parse(sessionStorage.getItem(CACHE_KEY)); return c?.id === uid ? c : null } catch { return null }
 }
-function writeCache(p) {
-  try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(p)) } catch (_) {}
-}
-function clearCache() {
-  try { sessionStorage.removeItem(CACHE_KEY) } catch (_) {}
-}
+function writeCache(p) { try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(p)) } catch (_) {} }
+function clearCache() { try { sessionStorage.removeItem(CACHE_KEY) } catch (_) {} }
 
 export const AppProvider = ({ children }) => {
-  const [user,    setUser]    = useState(null)
-  const [profile, setProfile] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const fetchingRef  = useRef(false)
-  const suppressRef  = useRef(false)
-  // Track initial load to avoid double-fetch
-  const initializedRef = useRef(false)
+  const [user,          setUser]          = useState(null)
+  const [profile,       setProfile]       = useState(null)
+  const [loading,       setLoading]       = useState(true)
+  // Verhindert Onboarding-Flash: true sobald erstes Profil-Fetch abgeschlossen
+  const [profileLoaded, setProfileLoaded] = useState(false)
+
+  const fetchingRef    = useRef(false)
+  const suppressRef    = useRef(false)
+  const sessionDoneRef = useRef(false)
 
   const lang = profile?.language || localLang()
   const t    = getT(lang)
 
-  useEffect(() => {
-    const saved = localStorage.getItem('theme') || 'system'
-    applyTheme(saved)
-  }, [])
-
+  useEffect(() => { applyTheme(localStorage.getItem('theme') || 'system') }, [])
   useEffect(() => {
     if (!profile?.theme) return
     applyTheme(profile.theme)
     localStorage.setItem('theme', profile.theme)
   }, [profile?.theme])
-
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: dark)')
     const fn = () => {
-      const cur = profile?.theme || localStorage.getItem('theme') || 'system'
-      if (cur === 'system') applyTheme('system')
+      if ((profile?.theme || localStorage.getItem('theme') || 'system') === 'system') applyTheme('system')
     }
-    mq.addEventListener('change', fn)
-    return () => mq.removeEventListener('change', fn)
+    mq.addEventListener('change', fn); return () => mq.removeEventListener('change', fn)
   }, [profile?.theme])
 
   const loadProfile = useCallback(async (userId, force = false) => {
     if (!force) {
       const cached = readCache(userId)
-      if (cached) { setProfile(cached); return cached }
+      if (cached) { setProfile(cached); setProfileLoaded(true); return cached }
     }
     if (fetchingRef.current) {
-      // Wait briefly and return cached if available
       const cached = readCache(userId)
       if (cached) return cached
       await new Promise(r => setTimeout(r, 100))
@@ -79,6 +67,7 @@ export const AppProvider = ({ children }) => {
       if (error && error.code !== 'PGRST116') throw error
       const p = data || null
       setProfile(p)
+      setProfileLoaded(true)
       if (p) {
         writeCache(p)
         try { localStorage.setItem('lang', p.language || 'de') } catch (_) {}
@@ -86,6 +75,7 @@ export const AppProvider = ({ children }) => {
       return p
     } catch (e) {
       console.error('loadProfile:', e)
+      setProfileLoaded(true)
       return null
     } finally {
       fetchingRef.current = false
@@ -95,53 +85,49 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     let mounted = true
 
-    // Fast path: check session immediately
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!mounted) return
-      const u = session?.user ?? null
-      setUser(u)
-      initializedRef.current = true
-      if (u) {
-        loadProfile(u.id).finally(() => { if (mounted) setLoading(false) })
-      } else {
-        clearCache(); setProfile(null); setLoading(false)
+    const initSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!mounted) return
+        const u = session?.user ?? null
+        setUser(u)
+        if (u) {
+          await loadProfile(u.id, false)
+        } else {
+          clearCache(); setProfile(null); setProfileLoaded(true)
+        }
+      } catch (_) {
+        if (mounted) setProfileLoaded(true)
+      } finally {
+        if (mounted) {
+          sessionDoneRef.current = true
+          setLoading(false)
+        }
       }
-    }).catch(() => { if (mounted) setLoading(false) })
+    }
+
+    initSession()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return
-
-        // Skip SIGNED_IN during password verification
+        if (!sessionDoneRef.current) return // initSession noch nicht fertig
         if (suppressRef.current && event === 'SIGNED_IN') return
 
         const u = session?.user ?? null
-
-        // On initial SIGNED_IN right after getSession, skip if already initialized
-        // to avoid double profile fetch
-        if (event === 'SIGNED_IN' && initializedRef.current && u?.id === user?.id) {
-          // Still update if email was just confirmed
-          if (u?.email_confirmed_at && !session?.user?.email_confirmed_at) {
-            setUser(u)
-            if (u) await loadProfile(u.id, true)
-          }
-          if (mounted) setLoading(false)
-          return
-        }
-
         setUser(u)
 
         if (u) {
-          const shouldForce = ['SIGNED_IN', 'TOKEN_REFRESHED', 'USER_UPDATED'].includes(event)
-          await loadProfile(u.id, shouldForce)
+          const force = ['SIGNED_IN', 'TOKEN_REFRESHED', 'USER_UPDATED'].includes(event)
+          await loadProfile(u.id, force)
         } else {
-          clearCache(); setProfile(null)
+          clearCache(); setProfile(null); setProfileLoaded(true)
         }
         if (mounted) setLoading(false)
       }
     )
+
     return () => { mounted = false; subscription.unsubscribe() }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadProfile])
 
   const signUp = (email, password, captchaToken) =>
@@ -151,35 +137,23 @@ export const AppProvider = ({ children }) => {
     supabase.auth.signInWithPassword({ email, password })
 
   const signOut = async () => { clearCache(); return supabase.auth.signOut() }
-
   const updatePassword = (pw) => supabase.auth.updateUser({ password: pw })
 
   const verifyPassword = async (password) => {
     if (!user?.email) return false
-
-    // Store current session to restore after verification
-    const { data: { session: currentSession } } = await supabase.auth.getSession()
-
     suppressRef.current = true
-    try {
-      // Try to sign in with the provided password
-      const { error } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password,
-      })
 
-      // Restore the original session if we had one
-      if (currentSession && !error) {
-        await supabase.auth.setSession({
-          access_token: currentSession.access_token,
-          refresh_token: currentSession.refresh_token,
-        })
-      }
+    let captchaToken
+    try { captchaToken = await getCaptchaToken() } catch (_) { captchaToken = undefined }
 
-      return !error
-    } finally {
-      setTimeout(() => { suppressRef.current = false }, 500)
-    }
+    const { error } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password,
+      ...(captchaToken ? { options: { captchaToken } } : {}),
+    })
+
+    setTimeout(() => { suppressRef.current = false }, 500)
+    return !error
   }
 
   const updateProfile = async (updates) => {
@@ -197,16 +171,12 @@ export const AppProvider = ({ children }) => {
 
   const markForDeletion = () => supabase.rpc('mark_my_account_for_deletion')
   const cancelDeletion  = () => supabase.rpc('cancel_my_account_deletion')
-
-  const restoreAccount = async () => {
-    await cancelDeletion()
-    await loadProfile(user.id, true)
-  }
-  const keepAndSignOut = () => signOut()
+  const restoreAccount  = async () => { await cancelDeletion(); await loadProfile(user.id, true) }
+  const keepAndSignOut  = () => signOut()
 
   return (
     <AppContext.Provider value={{
-      user, profile, loading, t, lang,
+      user, profile, loading, profileLoaded, t, lang,
       signUp, signIn, signOut, updatePassword, verifyPassword,
       updateProfile, loadProfile,
       markForDeletion, cancelDeletion,
