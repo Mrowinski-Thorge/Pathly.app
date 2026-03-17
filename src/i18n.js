@@ -1,7 +1,5 @@
 const de = {
-  // App
   appName: 'Pathly',
-  // Auth
   welcomeBack: 'Willkommen zurück',
   createAccount: 'Erstelle dein Konto',
   emailLabel: 'E-Mail', emailPlaceholder: 'deine@email.de',
@@ -24,30 +22,23 @@ const de = {
   orDivider: 'oder',
   signInWithGoogle: 'Mit Google anmelden',
   signUpWithGoogle: 'Mit Google registrieren',
-  // Verify
   verifyTitle: 'E-Mail bestätigen',
   verifyText: 'Wir haben dir eine Bestätigungs-E-Mail geschickt. Bitte bestätige deine Adresse, um fortzufahren.',
   verifyChecking: 'Warte auf Bestätigung…',
-  verifySuccess: 'Erfolgreich bestätigt!',
+  verifyConfirmed: 'Erfolgreich bestätigt! Weiterleitung…',
   backToLogin: 'Zurück zur Anmeldung',
   resendEmail: 'E-Mail erneut senden',
   resendIn: 'Erneut senden in',
   resendSuccess: 'Bestätigungs-E-Mail wurde erneut gesendet.',
-  rateLimitError: 'Zu viele Anfragen. Bitte warte einen Moment und versuche es erneut.',
-  // Password reset
   resetTitle: 'Passwort zurücksetzen',
   resetSubtitle: 'Gib deine E-Mail ein, um einen Reset-Link zu erhalten',
   sendReset: 'Reset-Link senden', sending: 'Senden…',
   resetSuccess: 'Reset-Link wurde an deine E-Mail gesendet.',
-  // Onboarding
   onboardingTitle: 'Wie heißt du?',
   onboardingSubtitle: 'Dein Name erscheint auf deinem Home-Screen.',
   namePlaceholder: 'Dein Name', letsGo: "Los geht's", saving: 'Speichern…',
-  // Nav
   home: 'Home', settingsNav: 'Einstellungen', back: 'Zurück',
-  // Home
   welcome: (name) => name ? `Herzlich willkommen, ${name}` : 'Herzlich willkommen',
-  // Settings
   general: 'Allgemein', account: 'Account',
   displayName: 'Anzeigename', displayNameDesc: 'Name eingeben…',
   language: 'Sprache', languageDesc: 'App-Sprache auswählen',
@@ -107,12 +98,11 @@ const en = {
   verifyTitle: 'Verify your Email',
   verifyText: "We've sent you a confirmation email. Please verify your address to continue.",
   verifyChecking: 'Waiting for confirmation…',
-  verifySuccess: 'Successfully verified!',
+  verifyConfirmed: 'Successfully confirmed! Redirecting…',
   backToLogin: 'Back to sign in',
   resendEmail: 'Resend Email',
   resendIn: 'Resend in',
   resendSuccess: 'Confirmation email has been resent.',
-  rateLimitError: 'Too many requests. Please wait a moment and try again.',
   resetTitle: 'Reset Password',
   resetSubtitle: 'Enter your email to receive a reset link',
   sendReset: 'Send reset link', sending: 'Sending…',
